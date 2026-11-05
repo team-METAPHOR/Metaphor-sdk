@@ -6,13 +6,30 @@ import { startRageDetection } from "./rage";
 import { buildPayload } from "./report";
 import type { ScriptConfig } from "./script-config";
 
+declare global {
+  interface Window {
+    /** Consent the host site collected itself (e.g. at signup). Read each time the dialog opens. */
+    metaphorConsent?: { environment?: boolean; screenshot?: boolean };
+  }
+}
+
+/** Only an explicit `true` from the host counts as consent. */
+function hostConsent(): { environment: boolean; screenshot: boolean } {
+  try {
+    const given = window.metaphorConsent;
+    return { environment: given?.environment === true, screenshot: given?.screenshot === true };
+  } catch {
+    return { environment: false, screenshot: false };
+  }
+}
+
 export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
   const host = document.createElement("div");
   const root = host.attachShadow({ mode: "open" });
   root.innerHTML = `<style>
     :host{all:initial;--surface:#fff;--ink:#172033;--edge:#64748b;--focus:#2563eb;--space1:8px;--space2:16px;--space3:24px;--float-gap:20px;--radius-field:8px;--radius-button:10px;--radius-dialog:16px;--control-height:44px;--field-padding:10px;--panel-width:440px;--viewport-gap:32px;--focus-width:3px;--focus-offset:3px;--border-width:1px;--text-size:16px;--heading-size:22px;--line-height:1.5;--textarea-height:120px;--checkbox-size:18px;--layer:2147483647;--shadow-float:0 4px 20px #0003;--shadow-dialog:0 12px 48px #0004;--backdrop:#0005;font:var(--text-size)/var(--line-height) system-ui,sans-serif;color-scheme:light;color:var(--ink)}
     @media(prefers-color-scheme:dark){:host{--surface:#111827;--ink:#f1f5f9;--edge:#94a3b8;--focus:#60a5fa;color-scheme:dark}}
-    *{box-sizing:border-box}button,input,textarea{font:inherit}button{cursor:pointer;min-height:var(--control-height);border:var(--border-width) solid var(--edge);border-radius:var(--radius-button);padding:var(--field-padding) var(--space2);background:var(--surface);color:var(--ink)}
+    *{box-sizing:border-box}[hidden]{display:none!important}button,input,textarea{font:inherit}button{cursor:pointer;min-height:var(--control-height);border:var(--border-width) solid var(--edge);border-radius:var(--radius-button);padding:var(--field-padding) var(--space2);background:var(--surface);color:var(--ink)}
     button:focus-visible,input:focus-visible,textarea:focus-visible{outline:var(--focus-width) solid var(--focus);outline-offset:var(--focus-offset)}
     button:hover{filter:brightness(.92)}button:active{filter:brightness(.85)}
     #launch{position:fixed;right:var(--float-gap);bottom:var(--float-gap);z-index:var(--layer);background:var(--ink);color:var(--surface);box-shadow:var(--shadow-float)}
@@ -25,6 +42,7 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
     <label><input id="environment" type="checkbox"> 브라우저 환경 정보 전송에 동의합니다</label>
     ${config.activity_allowed === true ? '<label><input id="activity" type="checkbox"> 최근 2분의 클릭·화면 이동·안내 문구 전송에 동의합니다</label>' : ""}
     ${config.screenshot_allowed ? '<label><input id="screenshot" type="checkbox"> 마스킹된 스크린샷 전송에 동의합니다</label>' : ""}
+    <p id="consent-note" hidden>가입할 때 동의한 정보(브라우저 환경, 마스킹된 스크린샷)가 함께 전송됩니다.</p>
     <p role="status" aria-live="polite"></p><div class="actions"><button id="cancel" type="button">취소</button><button id="submit" type="submit">신고 보내기</button></div></form></dialog>`;
   const style = root.querySelector("style");
   const sheet = new CSSStyleSheet();
@@ -81,6 +99,24 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
   screenshot?.addEventListener("change", () => {
     description.required = !screenshotConsent();
   });
+  const consentNote = root.querySelector("#consent-note");
+  // Hide a checkbox the host already has consent for; show it (unchecked) again once cleared.
+  const applyHostConsent = () => {
+    const given = hostConsent();
+    for (const [input, ok] of [
+      [environment, given.environment],
+      [screenshot, given.screenshot && config.screenshot_allowed],
+    ] as const) {
+      const label = input instanceof HTMLInputElement ? input.closest("label") : null;
+      if (!(input instanceof HTMLInputElement) || !label) continue;
+      if (ok) input.checked = true;
+      else if (label.hidden) input.checked = false;
+      label.hidden = ok;
+    }
+    if (consentNote instanceof HTMLElement)
+      consentNote.hidden = !(given.environment || (given.screenshot && config.screenshot_allowed));
+    description.required = !screenshotConsent();
+  };
   let pending: { signature: string; key: string; form: FormData } | undefined;
   let retryAt = 0;
   let attempts = 0;
@@ -113,12 +149,14 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
     if (hint instanceof HTMLElement) hint.hidden = true;
     submit.disabled = false;
     activitySnapshot = collector?.snapshot();
+    applyHostConsent();
     dialog.showModal();
   });
   launch.addEventListener("click", () => {
     if (!dialog.open) {
       detection = undefined;
       activitySnapshot = collector?.snapshot();
+      applyHostConsent();
       dialog.showModal();
     }
   });

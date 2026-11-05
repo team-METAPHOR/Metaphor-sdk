@@ -146,3 +146,40 @@ for (const [status, response, text] of [
     await expect(page.getByRole("status")).toContainText(text);
   });
 }
+
+test("uses consent the host collected at signup and hides those checkboxes", async ({ page }) => {
+  const requests = await mockWidget(page);
+  await page.addInitScript(() => {
+    window.metaphorConsent = { environment: true, screenshot: true };
+  });
+  await page.goto(SITE);
+  await page.getByRole("button", { name: "버그 신고", exact: true }).click();
+  await expect(page.getByLabel("브라우저 환경 정보 전송에 동의합니다")).toBeHidden();
+  await expect(page.getByLabel("마스킹된 스크린샷 전송에 동의합니다")).toBeHidden();
+  await expect(page.getByText("가입할 때 동의한")).toBeVisible();
+  await page.getByRole("button", { name: "신고 보내기" }).click();
+  await expect(page.getByRole("status")).toContainText("접수되었습니다");
+  const body = requests.find((r) => r.method === "POST")?.body?.toString() ?? "";
+  expect(body).toContain('"consent":{"environment":true,"screenshot":true}');
+  expect(body).toContain('filename="screenshot.png"');
+});
+
+test("shows checkboxes again once the host clears consent", async ({ page }) => {
+  await mockWidget(page);
+  await page.addInitScript(() => {
+    window.metaphorConsent = { environment: true, screenshot: false };
+  });
+  await page.goto(SITE);
+  const launch = page.getByRole("button", { name: "버그 신고", exact: true });
+  await launch.click();
+  await expect(page.getByLabel("브라우저 환경 정보 전송에 동의합니다")).toBeHidden();
+  await expect(page.getByLabel("마스킹된 스크린샷 전송에 동의합니다")).toBeVisible();
+  await page.getByRole("button", { name: "취소" }).click();
+  await page.evaluate(() => {
+    delete window.metaphorConsent;
+  });
+  await launch.click();
+  await expect(page.getByLabel("브라우저 환경 정보 전송에 동의합니다")).toBeVisible();
+  await expect(page.getByLabel("브라우저 환경 정보 전송에 동의합니다")).not.toBeChecked();
+  await expect(page.getByText("가입할 때 동의한")).toBeHidden();
+});
