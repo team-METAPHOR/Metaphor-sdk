@@ -4,7 +4,7 @@ import { defaultConfig, mockWidget, SITE } from "./mock";
 test("loads from the script tag and fetches config without cookies", async ({ page }) => {
   const requests = await mockWidget(page);
   await page.goto(SITE);
-  await expect(page.locator("html")).toHaveAttribute("data-metaphor-ready", "true");
+  await expect(page.getByRole("button", { name: "버그 신고", exact: true })).toBeVisible();
   expect(requests).toHaveLength(1);
   expect(requests[0]).toMatchObject({
     method: "GET",
