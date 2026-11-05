@@ -41,6 +41,13 @@ export function httpFailure(info: {
   }
 }
 
+// The SDK is served as `/sdk/v1/metaphor.js` (latest) or `/sdk/v1/metaphor-<semver>.js` (pinned).
+const SDK_SCRIPT = /\/metaphor(?:-\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)?\.js$/;
+
+export function isSdkScript(pathname: string): boolean {
+  return SDK_SCRIPT.test(pathname);
+}
+
 export function stackTop(
   filename: string,
   lineno: number,
@@ -80,7 +87,7 @@ export function startDetection(
         let stack_top: string | undefined;
         if (event.filename) {
           const source = new URL(event.filename, location.href);
-          if (source.pathname.endsWith("/metaphor.js")) return;
+          if (isSdkScript(source.pathname)) return;
           stack_top = stackTop(event.filename, event.lineno, event.colno, location.href);
         }
         prompt({

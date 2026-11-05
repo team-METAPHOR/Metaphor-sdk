@@ -9,7 +9,7 @@ report bugs (screenshot + description) and auto-detects some errors, then sends 
 Metaphor backend (`team-METAPHOR/Metaphor-back`), which reproduces them with an AI QA engine.
 
 ```html
-<script src="https://<cdn>/sdk/metaphor.js"
+<script src="https://api.<metaphor>/sdk/v1/metaphor.js"
         data-metaphor-project-key="mpk_..."
         data-metaphor-api-base="https://api.<metaphor>" defer></script>
 ```

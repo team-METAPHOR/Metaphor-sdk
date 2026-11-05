@@ -3,10 +3,13 @@
 고객사 사이트에 `<script>` 한 줄로 넣는 버그 신고 SDK입니다. 실제 사용자가 스크린샷과 설명으로 버그를 신고하면 Metaphor 백엔드가 AI QA 엔진으로 재현·검증합니다.
 
 ```html
-<script src="https://<cdn>/sdk/metaphor.js"
+<script src="https://api.<metaphor>/sdk/v1/metaphor.js"
         data-metaphor-project-key="mpk_..."
         data-metaphor-api-base="https://api.<metaphor>" defer></script>
 ```
+
+SDK 파일은 별도 CDN이 아니라 Metaphor 백엔드가 `<api_base>/sdk/v1/` 아래에서 직접 서빙합니다.
+설치 코드는 Metaphor 대시보드의 위젯 설정 화면에서 복사해 쓰는 것을 권장합니다. 대시보드 코드는 버전 고정 URL과 `integrity` 값을 함께 넣어 줍니다.
 
 - 백엔드 API 계약: `Metaphor-back/docs/api/widget-sdk.md`
 - 개발 규칙과 보안 규칙: [AGENTS.md](AGENTS.md)
@@ -39,18 +42,25 @@ Release 파일은 `metaphor.js`, `metaphor.js.sha384`(`sha384-<base64>` 형식 S
 
 ## SRI 사용
 
-백엔드가 Release 파일을 받아 `/sdk/v1/metaphor.js`로 서빙합니다(team-METAPHOR/Metaphor-back#85).
-고정된 버전을 쓸 때는 `metaphor.js.sha384`의 값을 `integrity`에 넣고 `crossorigin="anonymous"`를 함께 지정합니다.
+백엔드가 Release 파일을 받아 두 경로로 서빙합니다(team-METAPHOR/Metaphor-back#85).
+
+| URL                             | 내용                               | 캐시             |
+| ------------------------------- | ---------------------------------- | ---------------- |
+| `/sdk/v1/metaphor.js`           | 최신 버전. 릴리스마다 내용이 바뀜  | `max-age=300`    |
+| `/sdk/v1/metaphor-<version>.js` | 해당 버전 고정. 내용이 바뀌지 않음 | 1년, `immutable` |
+
+`integrity`는 버전 고정 URL(`metaphor-<version>.js`)에만 붙입니다. 최신 URL은 새 버전이 배포되면 내용이 바뀌므로, 여기에 `integrity`를 붙이면 해시가 맞지 않아 브라우저가 스크립트를 조용히 차단하고 위젯이 뜨지 않습니다.
+해시 값은 그 버전 Release의 `metaphor.js.sha384`이며 `crossorigin="anonymous"`를 함께 지정합니다. 대시보드에서 복사한 설치 코드에는 이미 들어 있습니다.
 
 ```html
-<script src="https://api.<metaphor>/sdk/v1/metaphor.js"
+<script src="https://api.<metaphor>/sdk/v1/metaphor-0.1.0.js"
         integrity="sha384-..."
         crossorigin="anonymous"
         data-metaphor-project-key="mpk_..."
         data-metaphor-api-base="https://api.<metaphor>" defer></script>
 ```
 
-SDK 파일이 바뀌면 해시도 바뀌므로 새 버전으로 올릴 때 `integrity` 값도 함께 바꿔야 합니다.
+새 버전으로 올릴 때는 URL의 버전과 `integrity` 값을 함께 바꿉니다.
 
 ## 현재 상태
 
