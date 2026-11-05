@@ -1,0 +1,31 @@
+{
+  "name": "@metaphor/web-sdk",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Metaphor Web SDK: in-page bug reporting for customer sites",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/build.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "test": "vitest run",
+    "size": "node scripts/size.mjs",
+    "harness": "node harness/server.mjs",
+    "e2e": "playwright test",
+    "check": "npm run lint && npm run typecheck && npm test && npm run build && npm run size"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.5",
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^26.6.6",
+    "esbuild": "^0.28.2",
+    "happy-dom": "^21.0.4",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}

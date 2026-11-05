@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>Harness Shop</title>
+    <script
+      src="/sdk/metaphor.js"
+      data-metaphor-project-key="{{PROJECT_KEY}}"
+      data-metaphor-api-base="{{API_BASE}}"
+      defer
+    ></script>
+  </head>
+  <body>
+    <h1>Harness Shop</h1>
+    <!-- Fixtures for SDK features: masked fields, a disabled button (rage/dead click), errors. -->
+    <form id="login">
+      <input name="email" type="email" placeholder="email" />
+      <input name="password" type="password" placeholder="password" />
+      <button type="submit">로그인</button>
+    </form>
+    <p data-private>홍길동 · 010-1234-5678</p>
+    <button id="sold-out" type="button" disabled>품절</button>
+    <button id="throw" type="button" onclick="setTimeout(() => { throw new Error('harness error') })">오류 발생</button>
+  </body>
+</html>
