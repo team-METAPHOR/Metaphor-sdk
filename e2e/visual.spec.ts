@@ -27,6 +27,7 @@ for (const width of [320, 390, 1440])
         page.getByLabel("설명", { exact: true }),
         page.getByLabel("브라우저 환경 정보 전송에 동의합니다"),
         page.getByLabel("마스킹된 스크린샷 전송에 동의합니다"),
+        page.getByLabel("최근 동작 기록 첨부"),
         page.getByRole("button", { name: "취소" }),
         page.getByRole("button", { name: "신고 보내기" }),
       ];

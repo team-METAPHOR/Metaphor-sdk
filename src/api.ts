@@ -15,11 +15,54 @@ export type AutomaticReport =
         };
       };
     };
+/** One recent reporter action. Never a value, body, header or query. Empty fields are omitted. */
+export type BreadcrumbItem =
+  | { readonly type: "navigation"; readonly path: string }
+  | {
+      readonly type: "click";
+      readonly tag?: string;
+      readonly role?: string;
+      readonly text?: string;
+      readonly testid?: string;
+      readonly selector?: string;
+    }
+  | {
+      readonly type: "input";
+      readonly tag?: string;
+      readonly input_type?: string;
+      readonly label?: string;
+      readonly testid?: string;
+      readonly selector?: string;
+      readonly checked?: boolean;
+      readonly selected_text?: string;
+      readonly length?: number;
+    }
+  | {
+      readonly type: "submit";
+      readonly label?: string;
+      readonly testid?: string;
+      readonly selector?: string;
+    }
+  | { readonly type: "key"; readonly key: string }
+  | {
+      readonly type: "request";
+      readonly method: HttpMethod;
+      readonly path: string;
+      readonly status?: number;
+      readonly duration_ms: number;
+    }
+  | { readonly type: "error"; readonly message: string };
+/** `t`: integer ms relative to submit time, in [-600000, 0]. */
+export type Breadcrumb = BreadcrumbItem & { readonly t: number };
 export type ReportPayload = {
   readonly title?: string;
   readonly description?: string;
   readonly page_url: string;
-  readonly consent?: { readonly environment?: boolean; readonly screenshot?: boolean };
+  readonly consent?: {
+    readonly environment?: boolean;
+    readonly screenshot?: boolean;
+    readonly activity?: boolean;
+  };
   readonly environment?: {
     readonly user_agent?: string;
     readonly language?: string;
@@ -27,6 +70,7 @@ export type ReportPayload = {
     readonly viewport?: { readonly width: number; readonly height: number };
   };
   readonly mask_boxes?: readonly (readonly [number, number, number, number])[];
+  readonly breadcrumbs?: readonly Breadcrumb[];
 } & ({ readonly error_type: "manual"; readonly error?: never } | AutomaticReport);
 
 export interface WidgetConfig {

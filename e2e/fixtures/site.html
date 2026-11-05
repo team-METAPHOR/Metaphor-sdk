@@ -23,6 +23,8 @@
     <select id="private-selection"><option>private selection</option></select>
     <div contenteditable="true" id="private-editable">private editable</div>
     <button id="sold-out" type="button" disabled>품절</button>
+    <button data-testid="add-cart" type="button" onclick="fetch('/api/cart?token=never-send', { method: 'POST', body: 'private request body' })">장바구니 담기</button>
+    <label>배송 메모 <input id="memo" type="text" /></label>
     <button id="throw" type="button" onclick="setTimeout(() => { throw new Error('harness error') })">오류 발생</button>
   </body>
 </html>

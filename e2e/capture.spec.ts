@@ -49,7 +49,7 @@ test("uploads only a masked PNG and leaves the host inputs untouched", async ({
       points,
     },
   );
-  expect(pixels).toHaveLength(6);
+  expect(pixels).toHaveLength(7);
   for (const pixel of pixels) expect(pixel).toEqual([0, 0, 0, 255]);
   expect(data.toString()).toContain('"screenshot":true');
   await expect(page.locator("input[name=email]")).toHaveValue("private@example.com");

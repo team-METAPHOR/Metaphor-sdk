@@ -14,7 +14,7 @@ test("offers a manual report for three pointerdowns on a disabled button", async
   expect(body).toContain('"error_type":"manual"');
   expect(body).not.toContain('"error":');
   expect(body).not.toContain("coordinates");
-  expect(body).not.toContain("breadcrumbs");
+  expect(body).not.toContain("clientX");
 });
 
 test("does not prompt for slow or distant pointerdowns", async ({ page }) => {

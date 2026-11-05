@@ -1,4 +1,5 @@
 import { submitReport, type WidgetConfig } from "./api";
+import { startBreadcrumbs } from "./breadcrumbs";
 import { captureViewport } from "./capture";
 import { type Detection, startDetection } from "./detect";
 import { startRageDetection } from "./rage";
@@ -17,12 +18,13 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
     #launch{position:fixed;right:var(--float-gap);bottom:var(--float-gap);z-index:var(--layer);background:var(--ink);color:var(--surface);box-shadow:var(--shadow-float)}
     dialog{position:fixed;margin:auto;width:min(var(--panel-width),calc(100vw - var(--viewport-gap)));max-height:calc(100dvh - var(--viewport-gap));overflow:auto;border:var(--border-width) solid var(--edge);border-radius:var(--radius-dialog);padding:var(--space3);background:var(--surface);color:var(--ink);box-shadow:var(--shadow-dialog)}
     dialog::backdrop{background:var(--backdrop)}h2{margin:0 0 var(--space3);font-size:var(--heading-size)}label{display:block;margin:var(--space2) 0 var(--space1);word-break:keep-all;overflow-wrap:anywhere}label:has(input[type=checkbox]){display:flex;align-items:center;gap:var(--space1);min-height:var(--control-height)}input[type=text],textarea{width:100%;border:var(--border-width) solid var(--edge);border-radius:var(--radius-field);padding:var(--field-padding);background:var(--surface);color:var(--ink)}textarea{min-height:var(--textarea-height);resize:vertical}.actions{display:flex;flex-wrap:wrap;gap:var(--space1);justify-content:flex-end;margin-top:var(--space3)}#submit{background:var(--ink);color:var(--surface)}p{line-height:var(--line-height);overflow-wrap:anywhere}input[type=checkbox]{width:var(--checkbox-size);height:var(--checkbox-size);flex-shrink:0;accent-color:var(--focus)}button:disabled{background:var(--edge);color:var(--surface);cursor:default}#hint{position:fixed;bottom:calc(var(--float-gap) + var(--control-height) + var(--space3));right:var(--float-gap);z-index:var(--layer);max-width:calc(100vw - 2 * var(--float-gap))}
-    #launch[hidden]~#hint{bottom:var(--float-gap)}
+    #launch[hidden]~#hint{bottom:var(--float-gap)}.help{margin:0;font-size:14px;color:var(--edge)}
     </style><button id="launch" type="button">버그 신고</button><button id="hint" type="button" hidden>오류가 감지되었습니다. 신고하기</button><dialog aria-labelledby="heading"><form>
     <h2 id="heading">버그 신고</h2><label for="title">제목</label><input id="title" type="text" maxlength="200">
     <label for="description">설명</label><textarea id="description" required></textarea>
     <label><input id="environment" type="checkbox"> 브라우저 환경 정보 전송에 동의합니다</label>
     ${config.screenshot_allowed ? '<label><input id="screenshot" type="checkbox"> 마스킹된 스크린샷 전송에 동의합니다</label>' : ""}
+    <label><input id="activity" type="checkbox" checked aria-describedby="activity-help"> 최근 동작 기록 첨부</label><p id="activity-help" class="help">클릭한 버튼, 이동한 화면, 요청 결과만 보내요. 입력한 내용은 보내지 않아요.</p>
     <p role="status" aria-live="polite"></p><div class="actions"><button id="cancel" type="button">취소</button><button id="submit" type="submit">신고 보내기</button></div></form></dialog>`;
   const style = root.querySelector("style");
   const sheet = new CSSStyleSheet();
@@ -35,6 +37,7 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
   const title = root.querySelector("#title");
   const description = root.querySelector("#description");
   const environment = root.querySelector("#environment");
+  const activity = root.querySelector("#activity");
   const screenshot = root.querySelector("#screenshot");
   const screenshotConsent = () =>
     screenshot instanceof HTMLInputElement && screenshot.checked && config.screenshot_allowed;
@@ -47,6 +50,7 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
     !(title instanceof HTMLInputElement) ||
     !(description instanceof HTMLTextAreaElement) ||
     !(environment instanceof HTMLInputElement) ||
+    !(activity instanceof HTMLInputElement) ||
     !(submit instanceof HTMLButtonElement) ||
     !status
   )
@@ -92,6 +96,7 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
       hint.hidden = false;
     }
   };
+  const breadcrumbs = startBreadcrumbs(host, config.mask_selectors, settings.apiBase);
   const stopDetection = startDetection(config, settings.apiBase, offer);
   const stopRage = config.auto_detect.enabled
     ? startRageDetection(host, () => offer())
@@ -117,16 +122,15 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
   root.querySelector("#cancel")?.addEventListener("click", () => dialog.close());
   const send = async () => {
     if (submit.disabled || Date.now() < retryAt) return;
-    const payload = buildPayload(
-      {
-        title: title.value,
-        description: description.value,
-        environment: environment.checked,
-        screenshot: screenshotConsent(),
-      },
-      location.href,
-      detection,
-    );
+    const draft = {
+      title: title.value,
+      description: description.value,
+      environment: environment.checked,
+      screenshot: screenshotConsent(),
+      activity: activity.checked,
+    };
+    const payload = buildPayload(draft, location.href, detection);
+    // Breadcrumbs are left out of the signature: a retry resends the first attempt's body.
     const signature = JSON.stringify(payload);
     if (payload.title.length > 200 || payload.description.length > description.maxLength) {
       status.textContent = "입력 가능한 글자 수를 초과했습니다.";
@@ -155,7 +159,15 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
           return;
         }
       }
-      body.append("payload", signature);
+      // Newest breadcrumbs that still fit the 32 KiB payload limit.
+      const trail = draft.activity ? breadcrumbs() : [];
+      let json = signature;
+      for (; trail.length; trail.shift()) {
+        json = JSON.stringify(buildPayload(draft, location.href, detection, trail));
+        if (new Blob([json]).size <= 32768) break;
+        json = signature;
+      }
+      body.append("payload", json);
       pending = {
         signature,
         key:

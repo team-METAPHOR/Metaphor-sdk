@@ -22,7 +22,7 @@ test("submits a text report with explicit environment consent and no cookies", a
   });
   const body = report?.body?.toString() ?? "";
   expect(body).toContain('"page_url":"http://shop.test/cart"');
-  expect(body).toContain('"consent":{"environment":false,"screenshot":false}');
+  expect(body).toContain('"consent":{"environment":false,"screenshot":false,"activity":true}');
   expect(body).not.toContain('"user_agent"');
   expect(body).not.toContain('filename="screenshot.png"');
 });
