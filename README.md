@@ -44,9 +44,9 @@ Release 파일은 `metaphor.js`, `metaphor.js.sha384`(`sha384-<base64>` 형식 S
 
 백엔드가 Release 파일을 받아 두 경로로 서빙합니다(team-METAPHOR/Metaphor-back#85).
 
-| URL | 내용 | 캐시 |
-|---|---|---|
-| `/sdk/v1/metaphor.js` | 최신 버전. 릴리스마다 내용이 바뀜 | `max-age=300` |
+| URL                             | 내용                               | 캐시             |
+| ------------------------------- | ---------------------------------- | ---------------- |
+| `/sdk/v1/metaphor.js`           | 최신 버전. 릴리스마다 내용이 바뀜  | `max-age=300`    |
 | `/sdk/v1/metaphor-<version>.js` | 해당 버전 고정. 내용이 바뀌지 않음 | 1년, `immutable` |
 
 `integrity`는 버전 고정 URL(`metaphor-<version>.js`)에만 붙입니다. 최신 URL은 새 버전이 배포되면 내용이 바뀌므로, 여기에 `integrity`를 붙이면 해시가 맞지 않아 브라우저가 스크립트를 조용히 차단하고 위젯이 뜨지 않습니다.
