@@ -54,8 +54,8 @@ src/index.ts          entry: boot from the script tag, fetch config, start featu
 src/script-config.ts  reads data-metaphor-* attributes
 src/api.ts            backend client and wire types
 tests/                unit tests (vitest + happy-dom), *.test.ts
-harness/              local customer page (:4100) + mock widget API (:4200, different origin)
-e2e/                  Playwright tests against the harness
+e2e/                  Playwright tests; e2e/mock.ts serves the fixture page and a mock API
+                      (different origins) via route interception — no servers to run
 scripts/              build (esbuild → dist/metaphor.js, IIFE) and size budget
 ```
 
@@ -65,15 +65,13 @@ scripts/              build (esbuild → dist/metaphor.js, IIFE) and size budget
 npm ci
 npx playwright install chromium --only-shell   # once
 npm run check      # lint + typecheck + unit + build + size
-npm run e2e        # builds, starts the harness, runs Playwright
-npm run harness    # manual: open http://localhost:4100
-METAPHOR_API_BASE=http://localhost:8000 METAPHOR_PROJECT_KEY=mpk_... npm run harness
-                   # same page against a real local backend
+npm run e2e        # builds, then runs Playwright
 ```
 
-The mock API records every request (`GET :4200/__mock/requests`), can change the config
-(`POST :4200/__mock/config`), and resets with `POST :4200/__mock/reset`. Assert on what the SDK
-sent (no cookies, right origin, right payload) rather than on internals.
+`mockWidget(page, config)` in `e2e/mock.ts` returns the list of API requests the SDK made.
+Assert on what the SDK sent (no cookies, right origin, right payload) rather than on internals.
+Manual checks against a real backend use the demo site `team-METAPHOR/BugLab-shop`, which
+embeds the SDK via `METAPHOR_SDK_URL` / `METAPHOR_API_URL` / `METAPHOR_PROJECT_KEY`.
 
 ## 6. Workflow
 
