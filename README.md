@@ -22,6 +22,36 @@ npm run e2e       # Playwright (테스트 페이지와 mock API를 route로 가�
 
 실제 백엔드와 함께 확인할 때는 SDK가 연동된 데모 사이트 `BugLab-shop`을 사용합니다.
 
+## 릴리스
+
+1. `package.json`의 `version`을 올립니다(`npm version X.Y.Z --no-git-tag-version`).
+2. `CHANGELOG.md`에 해당 버전 항목을 추가합니다.
+3. PR을 `main`에 머지한 뒤 그 커밋에 `vX.Y.Z` 태그를 만들어 push합니다.
+
+```bash
+git tag vX.Y.Z
+git push origin vX.Y.Z
+```
+
+`.github/workflows/release.yml`이 태그와 `package.json` 버전이 같은지 확인하고 `npm run check`를 통과한 빌드를 GitHub Release에 올립니다.
+Release 파일은 `metaphor.js`, `metaphor.js.sha384`(`sha384-<base64>` 형식 SRI 해시), `VERSION`입니다.
+빌드 결과물 첫 줄에는 `/*! Metaphor Web SDK vX.Y.Z */` 주석이 들어갑니다.
+
+## SRI 사용
+
+백엔드가 Release 파일을 받아 `/sdk/v1/metaphor.js`로 서빙합니다(team-METAPHOR/Metaphor-back#85).
+고정된 버전을 쓸 때는 `metaphor.js.sha384`의 값을 `integrity`에 넣고 `crossorigin="anonymous"`를 함께 지정합니다.
+
+```html
+<script src="https://api.<metaphor>/sdk/v1/metaphor.js"
+        integrity="sha384-..."
+        crossorigin="anonymous"
+        data-metaphor-project-key="mpk_..."
+        data-metaphor-api-base="https://api.<metaphor>" defer></script>
+```
+
+SDK 파일이 바뀌면 해시도 바뀌므로 새 버전으로 올릴 때 `integrity` 값도 함께 바꿔야 합니다.
+
 ## 현재 상태
 
 Shadow DOM 신고 패널, 동의 기반 환경 정보/마스킹 PNG, multipart 전송과 접수/중복/오류 상태를 제공합니다.
