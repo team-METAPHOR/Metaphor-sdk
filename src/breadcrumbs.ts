@@ -13,6 +13,8 @@ const INTERACTIVE =
   "button,a,[role=button],[role=link],[role=tab],[role=menuitem],[role=checkbox],[role=switch],summary,label,input[type=button],input[type=submit],input[type=checkbox],input[type=radio]";
 const FIELD = "input,textarea,select,[contenteditable]";
 const KEYS = /^(?:Enter|Escape|Tab|Backspace|Arrow(?:Up|Down|Left|Right))$/;
+const isSecret = (element: Element) =>
+  element instanceof HTMLInputElement && /^(?:password|hidden|file)$/.test(element.type);
 const TEXT_TYPES = /^(?:text|search|email|tel|url|number)$/;
 
 type Fields = Record<string, string | number | boolean | undefined>;
@@ -54,11 +56,29 @@ export function startBreadcrumbs(host: Element, maskSelectors: readonly string[]
         text += ` ${textOf(node)}`;
     return text;
   };
+  // Masked elements get a structural selector only: no ids, attribute values or text.
+  const structural = (element: Element) => {
+    const path: string[] = [];
+    for (
+      let node: Element | null = element;
+      node && node.localName !== "body" && path.length < 4;
+      node = node.parentElement
+    ) {
+      const siblings = node.parentElement?.children ?? [];
+      const same = [...siblings].filter((other) => other.localName === node?.localName);
+      path.unshift(
+        same.length > 1
+          ? `${node.localName}:nth-of-type(${same.indexOf(node) + 1})`
+          : node.localName,
+      );
+    }
+    return path.join(" > ");
+  };
   const selectorOf = (element: Element, label?: string) => {
     const tag = element.localName;
     const quote = (value: string) => `"${value.replace(/["\\]/g, "\\$&")}"`;
-    const testid = element.getAttribute("data-testid");
-    if (testid) return `[data-testid=${quote(testid.slice(0, 80))}]`;
+    const testid = clean(element.getAttribute("data-testid"));
+    if (testid) return `[data-testid=${quote(testid)}]`;
     // Skip ids that look generated (React `:r1:`, hashes, long digit runs).
     const stable = (id: string) => /^[A-Za-z][\w-]{0,39}$/.test(id) && !/\d{3}/.test(id);
     if (stable(element.id)) return `#${element.id}`;
@@ -74,10 +94,13 @@ export function startBreadcrumbs(host: Element, maskSelectors: readonly string[]
     }
     return path.join(" > ");
   };
-  const locate = (element: Element, label?: string) => ({
-    testid: element.getAttribute("data-testid")?.slice(0, 80),
-    selector: selectorOf(element, label).slice(0, 200),
-  });
+  const locate = (element: Element, label?: string, hide?: boolean) =>
+    hide
+      ? { selector: structural(element).slice(0, 200) }
+      : {
+          testid: clean(element.getAttribute("data-testid")),
+          selector: selectorOf(element, label).slice(0, 200),
+        };
   const origin = (event: Event) => {
     const path = event.composedPath();
     if (path.includes(host)) return null;
@@ -127,8 +150,8 @@ export function startBreadcrumbs(host: Element, maskSelectors: readonly string[]
   listen("click", (event) => {
     const element = origin(event)?.closest(INTERACTIVE);
     if (!element) return;
-    const hidden =
-      element.matches(FIELD) || element.closest("[contenteditable]") || masked(element);
+    const secret = masked(element) || isSecret(element);
+    const hidden = secret || element.matches(FIELD) || element.closest("[contenteditable]");
     const aria = hidden ? undefined : clean(element.getAttribute("aria-label"));
     record({
       type: "click",
@@ -136,7 +159,7 @@ export function startBreadcrumbs(host: Element, maskSelectors: readonly string[]
         tag: element.localName,
         role: element.getAttribute("role")?.slice(0, 32),
         text: hidden ? undefined : (aria ?? clean(textOf(element))),
-        ...locate(element, aria),
+        ...locate(element, aria, secret),
       }),
     } as BreadcrumbItem);
   });
@@ -153,7 +176,7 @@ export function startBreadcrumbs(host: Element, maskSelectors: readonly string[]
       return;
     const type = element instanceof HTMLInputElement ? element.type : undefined;
     const base = { tag: element.localName, input_type: type?.slice(0, 32) };
-    if (type === "password" || type === "hidden" || type === "file") {
+    if (isSecret(element)) {
       record({ type: "input", ...compact(base) } as BreadcrumbItem);
       return;
     }
@@ -173,12 +196,16 @@ export function startBreadcrumbs(host: Element, maskSelectors: readonly string[]
       ...compact({
         ...base,
         label,
-        ...locate(element, aria),
+        ...locate(element, aria, hide),
         checked:
           element instanceof HTMLInputElement && /^(?:checkbox|radio)$/.test(element.type)
             ? element.checked
             : undefined,
-        selected_text: option && !hide ? clean(option.label || option.text) : undefined,
+        // Option names can be personal data: only for selects the site opts in.
+        selected_text:
+          option && !hide && element.closest("[data-metaphor-record]")
+            ? clean(option.label || option.text)
+            : undefined,
         length:
           element instanceof HTMLTextAreaElement || TEXT_TYPES.test(type ?? "")
             ? element.value.length
@@ -190,12 +217,15 @@ export function startBreadcrumbs(host: Element, maskSelectors: readonly string[]
   listen("submit", (event) => {
     const form = origin(event);
     if (!(form instanceof HTMLFormElement)) return;
-    const aria = masked(form) ? undefined : clean(form.getAttribute("aria-label"));
+    const hide = masked(form);
+    const aria = hide ? undefined : clean(form.getAttribute("aria-label"));
     record({
       type: "submit",
       ...compact({
-        label: aria ?? clean(form.getAttribute("name")) ?? clean(form.getAttribute("data-testid")),
-        ...locate(form, aria),
+        label: hide
+          ? undefined
+          : (aria ?? clean(form.getAttribute("name")) ?? clean(form.getAttribute("data-testid"))),
+        ...locate(form, aria, hide),
       }),
     } as BreadcrumbItem);
   });

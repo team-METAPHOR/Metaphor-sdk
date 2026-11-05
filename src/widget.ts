@@ -24,7 +24,7 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
     <label for="description">설명</label><textarea id="description" required></textarea>
     <label><input id="environment" type="checkbox"> 브라우저 환경 정보 전송에 동의합니다</label>
     ${config.screenshot_allowed ? '<label><input id="screenshot" type="checkbox"> 마스킹된 스크린샷 전송에 동의합니다</label>' : ""}
-    <label><input id="activity" type="checkbox" checked aria-describedby="activity-help"> 최근 동작 기록 첨부</label><p id="activity-help" class="help">클릭한 버튼, 이동한 화면, 요청 결과만 보내요. 입력한 내용은 보내지 않아요.</p>
+    <label><input id="activity" type="checkbox" checked aria-describedby="activity-help"> 최근 동작 기록 첨부</label><p id="activity-help" class="help">신고 직전 10분 동안 이동한 화면 경로, 누른 버튼 이름, 입력 칸 종류와 글자 수, 같은 사이트 요청의 주소·결과, 오류 종류를 보내요. 입력한 내용은 보내지 않아요.</p>
     <p role="status" aria-live="polite"></p><div class="actions"><button id="cancel" type="button">취소</button><button id="submit" type="submit">신고 보내기</button></div></form></dialog>`;
   const style = root.querySelector("style");
   const sheet = new CSSStyleSheet();

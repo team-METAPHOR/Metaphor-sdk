@@ -85,7 +85,11 @@ it("omits text for fields and masked areas and never reads values", () => {
   click(document.querySelector("label") as Element);
   expect(last()).toMatchObject({ tag: "label", text: "메모" });
   click(document.querySelector("[data-mask] button") as Element);
-  expect(last()).toEqual({ type: "click", tag: "button", selector: "div > button" });
+  expect(last()).toEqual({
+    type: "click",
+    tag: "button",
+    selector: "div:nth-of-type(1) > button",
+  });
   click(document.querySelector("[data-private] a") as Element);
   expect(last()).not.toHaveProperty("text");
   const json = JSON.stringify(trail());
@@ -110,6 +114,7 @@ it("records input changes as metadata only", () => {
     <input type="hidden" name="csrf">
     <input type="checkbox" aria-label="약관 동의">
     <select name="size"><option>S</option><option selected>XL</option></select>
+    <div data-metaphor-record><select name="color"><option>파랑</option><option selected>빨강</option></select></div>
     <select data-sensitive name="card"><option selected>신한 1234</option></select>
     <textarea placeholder="요청 사항"></textarea>`;
   const email = document.querySelector("#email") as HTMLInputElement;
@@ -135,15 +140,18 @@ it("records input changes as metadata only", () => {
   change(box);
   expect(last()).toMatchObject({ input_type: "checkbox", label: "약관 동의", checked: true });
   change(document.querySelector("[name=size]") as Element);
-  expect(last()).toMatchObject({ tag: "select", label: "size", selected_text: "XL" });
+  expect(last()).toMatchObject({ tag: "select", label: "size" });
+  expect(last()).not.toHaveProperty("selected_text");
+  change(document.querySelector("[name=color]") as Element);
+  expect(last()).toMatchObject({ tag: "select", label: "color", selected_text: "빨강" });
   change(document.querySelector("[name=card]") as Element);
-  expect(last()).toEqual({ type: "input", tag: "select", selector: "select" });
+  expect(last()).toEqual({ type: "input", tag: "select", selector: "select:nth-of-type(2)" });
   const notes = document.querySelector("textarea") as HTMLTextAreaElement;
   notes.value = "문 앞에 놔주세요";
   change(notes);
   expect(last()).toMatchObject({ tag: "textarea", label: "요청 사항", length: 9 });
   const json = JSON.stringify(trail());
-  for (const secret of ["private@example.com", "hunter2", "pw", "신한", "문 앞"])
+  for (const secret of ["private@example.com", "hunter2", "pw", "신한", "문 앞", "XL"])
     expect(json).not.toContain(secret);
 });
 
@@ -215,4 +223,43 @@ it("keeps 100, sends the newest 50 within 10 minutes and dedupes repeats", () =>
   expect(sent.every(({ t }) => Number.isInteger(t) && t <= 0 && t >= -600_000)).toBe(true);
   expect(sent.at(-1)?.t).toBe(-250);
   expect(trail(Date.now() + 600_000)).toHaveLength(0);
+});
+
+it("gives masked and secret elements a structural selector without testid or ids", () => {
+  document.body.innerHTML = `
+    <section data-private>
+      <button data-testid="user-kim" id="kim" aria-label="김철수">a</button>
+      <button data-testid="user-lee" id="lee">b</button>
+    </section>
+    <input type="password" id="pw" data-testid="pw-field">
+    <form data-sensitive name="card-form" data-testid="card"><button>pay</button></form>
+    <button data-testid="mail private@example.com">c</button>`;
+  click(document.querySelector("#lee") as Element);
+  expect(last()).toEqual({
+    type: "click",
+    tag: "button",
+    selector: "section > button:nth-of-type(2)",
+  });
+  change(document.querySelector("#pw") as Element);
+  expect(last()).toEqual({ type: "input", tag: "input", input_type: "password" });
+  document.querySelector("form")?.dispatchEvent(new Event("submit", { bubbles: true }));
+  expect(last()).toEqual({ type: "submit", selector: "form" });
+  click(document.querySelector("body > button") as Element);
+  expect(last()).toMatchObject({ testid: "mail [이메일]" });
+  const json = JSON.stringify(trail());
+  for (const secret of ["kim", "lee", "김철수", "pw-field", "card", "private@example.com"])
+    expect(json).not.toContain(secret);
+});
+
+it("redacts personal data in navigation and request paths", async () => {
+  history.pushState(null, "", "/users/kim@example.com/orders/1234567");
+  history.pushState(null, "", `/members/${encodeURIComponent("홍길동")}/products/1`);
+  await fetch("/api/phones/01012345678");
+  expect(seen()).toEqual(
+    expect.arrayContaining([
+      { type: "navigation", path: "/users/:redacted/orders/:redacted" },
+      { type: "navigation", path: "/members/:redacted/products/1" },
+      expect.objectContaining({ type: "request", path: "/api/phones/:redacted" }),
+    ]),
+  );
 });
