@@ -26,18 +26,20 @@ rename the attributes.
   optional `screenshot` (PNG), optional `Idempotency-Key` header
 - The payload schema is a whitelist; unknown fields are rejected (422). Keep TS types in
   `src/api.ts` identical to the doc.
-- Breadcrumbs (user click/navigation history) are **on hold** for security review. Do not
-  collect or send them until the backend contract adds them.
+- Breadcrumbs (`src/breadcrumbs.ts`): recent navigation/click/input/submit/key/request/error
+  metadata, in memory only (ring buffer of 100, newest 50 within 10 minutes sent). Sent only
+  with `consent.activity`. Never values, bodies, headers, queries, or text from fields and
+  masked areas; keys only from a fixed list and never in password fields.
 
 ## 3. Hard rules (security and host safety)
 
 - Never send cookies (`credentials: "omit"` on every request), auth headers, tokens, request or
-  response bodies, input values, or keystrokes.
+  response bodies, input values, or typed characters (breadcrumbs keep only navigation keys).
 - Screenshots: mask before capture. Black out every element matching `mask_selectors` plus all
   `input`, `textarea`, `select`, `[contenteditable]` values in the cloned DOM, then render. Only
   the masked image is uploaded. If a selector throws, abort the capture.
 - Send a screenshot or environment data only with the user's explicit consent in the report UI
-  (`consent.screenshot`, `consent.environment`).
+  (`consent.screenshot`, `consent.environment`). Breadcrumbs need `consent.activity`.
 - Never throw into the host page. Every entry point catches and stays silent. A disabled or
   unreachable widget must be a no-op.
 - Load once (`window.__metaphorLoaded`). No globals beyond that unless documented here.

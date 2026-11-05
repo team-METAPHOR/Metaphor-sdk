@@ -80,13 +80,37 @@ Release 파일은 `metaphor.js`, `metaphor.js.sha384`(`sha384-<base64>` 형식 S
 
 Shadow DOM 신고 패널, 동의 기반 환경 정보/마스킹 PNG, multipart 전송과 접수/중복/오류 상태를 제공합니다.
 오류 감지는 JavaScript 오류, unhandledrejection, fetch/XHR 5xx를 신고 안내로 표시하며 사용자가 제출해야 전송합니다.
+동의한 경우 신고 직전의 최근 동작 기록(breadcrumbs)을 함께 보냅니다.
 1초/30px 안의 pointerdown 3회도 수동 신고를 안내합니다. 자동 안내는 60초 간격이며 429 이후 해당 페이지 세션에서 중단합니다.
 
 ## 개인정보 및 캡처
 
-모든 SDK 요청은 `credentials: "omit"`이며 호스트 입력값, 요청/응답 헤더·본문, 저장소, 클릭 기록을 수집하지 않습니다.
+모든 SDK 요청은 `credentials: "omit"`이며 호스트 입력값, 요청/응답 헤더·본문, 쿠키, 저장소를 수집하지 않습니다.
 페이지 URL의 쿼리/fragment를 제거하고, 신고 텍스트의 이메일/명시적 인증 정보와 URL 쿼리를 가립니다.
 오류 메시지는 오류 종류만 사용하고 HTTP는 method/path/status만 기록합니다.
+
+### 최근 동작 기록(breadcrumbs)
+
+신고 패널의 `최근 동작 기록 첨부`(기본 선택)를 선택한 상태로 제출하면 신고 직전 동작을 `breadcrumbs`로 함께 보냅니다.
+선택을 해제하면 보내지 않습니다(`consent.activity: false`). 기록은 메모리에만 두며(최근 100개) 저장소에 쓰지 않고,
+제출 시점 기준 10분 이내의 최신 50개만 보냅니다. 각 항목의 `t`는 제출 시점 대비 ms(0 이하)입니다.
+
+| 종류         | 보내는 값                                                                   |
+| ------------ | --------------------------------------------------------------------------- |
+| `navigation` | 경로만(`sanitizePath`). 쿼리·fragment는 보내지 않음                         |
+| `click`      | 태그, role, 보이는 라벨(80자), `data-testid`, 안정적인 선택자               |
+| `input`      | 태그, 입력 종류, 라벨, 체크 여부, 선택한 옵션 이름, 글자 수. **값은 없음**  |
+| `submit`     | 폼 라벨(aria-label/name/testid), 선택자                                     |
+| `key`        | Enter, Escape, Tab, 방향키, Backspace만. 비밀번호 칸에 포커스가 있으면 없음 |
+| `request`    | 같은 origin fetch/XHR의 method, 경로, status, 소요 시간. Metaphor API 제외  |
+| `error`      | 오류 종류만(`TypeError 발생` 등)                                            |
+
+- 입력/편집 요소(`input`, `textarea`, `select`, `[contenteditable]`)와 `mask_selectors`·`[data-private]`·`[data-sensitive]` 안의 요소는 텍스트를 보내지 않습니다. 가린 영역의 `select`는 선택한 옵션 이름도 보내지 않습니다.
+- 비밀번호·hidden·파일 입력은 태그와 입력 종류만 남깁니다. 다른 입력도 값 대신 글자 수만 보냅니다.
+- SDK 패널 안의 클릭·키 입력은 기록하지 않습니다. 라벨 텍스트도 신고 텍스트와 같은 가림 규칙(이메일·인증 정보)을 거칩니다.
+- 같은 동작이 연달아 반복되면 하나로 합칩니다. payload가 32 KiB를 넘으면 오래된 항목부터 뺍니다.
+
+### 스크린샷
 
 스크린샷은 입력/편집 영역과 `mask_selectors`를 가린 복제 DOM만 렌더링하며 SDK UI는 제외합니다.
 외부 리소스를 가져오지 않으므로 이미지, 영상, iframe, canvas, SVG 및 shadow 콘텐츠는 검게 표시됩니다.
