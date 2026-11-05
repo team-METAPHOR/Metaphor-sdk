@@ -99,15 +99,23 @@ Shadow DOM 신고 패널, 동의 기반 환경 정보/마스킹 PNG, multipart �
 | ------------ | --------------------------------------------------------------------------- |
 | `navigation` | 경로만(`sanitizePath`). 쿼리·fragment는 보내지 않음                         |
 | `click`      | 태그, role, 보이는 라벨(80자), `data-testid`, 안정적인 선택자               |
-| `input`      | 태그, 입력 종류, 라벨, 체크 여부, 선택한 옵션 이름, 글자 수. **값은 없음**  |
+| `input`      | 태그, 입력 종류, 라벨, 체크 여부, 글자 수(옵션 이름은 opt-in). **값은 없음** |
 | `submit`     | 폼 라벨(aria-label/name/testid), 선택자                                     |
 | `key`        | Enter, Escape, Tab, 방향키, Backspace만. 비밀번호 칸에 포커스가 있으면 없음 |
 | `request`    | 같은 origin fetch/XHR의 method, 경로, status, 소요 시간. Metaphor API 제외  |
 | `error`      | 오류 종류만(`TypeError 발생` 등)                                            |
 
-- 입력/편집 요소(`input`, `textarea`, `select`, `[contenteditable]`)와 `mask_selectors`·`[data-private]`·`[data-sensitive]` 안의 요소는 텍스트를 보내지 않습니다. 가린 영역의 `select`는 선택한 옵션 이름도 보내지 않습니다.
+- 입력/편집 요소(`input`, `textarea`, `select`, `[contenteditable]`)와 `mask_selectors`·`[data-private]`·`[data-sensitive]` 안의 요소는 텍스트를 보내지 않습니다.
+- 가린 영역 안의 요소와 비밀번호·hidden·파일 입력은 `data-testid`, id, aria-label을 보내지 않고, 선택자도 `section > button:nth-of-type(2)`처럼 태그 구조로만 만듭니다.
+- `select`에서 선택한 옵션 이름(`selected_text`)은 사이트가 `select`나 그 조상에 `data-metaphor-record` 속성을 붙인 경우에만 보냅니다. 가린 영역 안이면 속성이 있어도 보내지 않습니다.
+
+  ```html
+  <div data-metaphor-record><select name="size">...</select></div>
+  ```
+
+- 화면·요청 경로에서 `@`, 6자리 이상 연속 숫자, UUID/16자 이상 hex, ASCII가 아닌 문자가 들어간 세그먼트는 `:redacted`로 바꿉니다(`/products/1` 같은 짧은 숫자 id는 유지). `page_url`과 5xx 경로에도 같은 규칙이 적용됩니다.
 - 비밀번호·hidden·파일 입력은 태그와 입력 종류만 남깁니다. 다른 입력도 값 대신 글자 수만 보냅니다.
-- SDK 패널 안의 클릭·키 입력은 기록하지 않습니다. 라벨 텍스트도 신고 텍스트와 같은 가림 규칙(이메일·인증 정보)을 거칩니다.
+- SDK 패널 안의 클릭·키 입력은 기록하지 않습니다. 라벨 텍스트와 `data-testid`도 신고 텍스트와 같은 가림 규칙(이메일·인증 정보)을 거칩니다.
 - 같은 동작이 연달아 반복되면 하나로 합칩니다. payload가 32 KiB를 넘으면 오래된 항목부터 뺍니다.
 
 ### 스크린샷
