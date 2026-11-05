@@ -182,7 +182,8 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
       stopRage();
       if (hint instanceof HTMLElement) hint.hidden = true;
       retryAt =
-        result.code === "DAILY_LIMIT_EXCEEDED"
+        // Both daily caps reset at UTC midnight (program budget and widget share of it).
+        ["DAILY_LIMIT_EXCEEDED", "WIDGET_DAILY_LIMITED"].includes(result.code)
           ? Date.parse(`${new Date(Date.now() + 86400000).toISOString().slice(0, 10)}T00:00:00Z`)
           : Date.now() + 30000;
       status.textContent = "신고 한도에 도달했습니다. 잠시 후 다시 시도해 주세요.";
@@ -203,6 +204,8 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
         "WIDGET_NOT_FOUND",
         "PROGRAM_NOT_ACTIVE",
         "EXTERNAL_AI_NOT_ALLOWED",
+        // The customer has not proven ownership of the test origin yet; retrying cannot help.
+        "ORIGIN_NOT_VERIFIED",
       ].includes(result.code)
     )
       host.remove();
