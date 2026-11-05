@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { httpFailure, safeError, stackTop } from "../src/detect";
+import { httpFailure, isSdkScript, safeError, stackTop } from "../src/detect";
 
 it("records only an allowed method, query-free path and 5xx status", () => {
   expect(
@@ -46,4 +46,14 @@ it("builds stack_top from a sanitized script URL", () => {
     "https://shop.test/assets/index-BdK3x9aQ.js:1:2",
   );
   expect(stackTop("chrome-extension://abc/x.js", 1, 2, "https://shop.test/")).toBeUndefined();
+});
+
+it("recognizes the SDK's own latest and version-pinned script URLs", () => {
+  expect(isSdkScript("/sdk/v1/metaphor.js")).toBe(true);
+  expect(isSdkScript("/sdk/v1/metaphor-0.1.0.js")).toBe(true);
+  expect(isSdkScript("/sdk/v1/metaphor-1.2.3-rc.1.js")).toBe(true);
+  expect(isSdkScript("/assets/metaphor-helper.js")).toBe(false);
+  expect(isSdkScript("/sdk/v1/metaphor-0.1.js")).toBe(false);
+  expect(isSdkScript("/assets/app.js")).toBe(false);
+  expect(isSdkScript("/sdk/v1/metaphor.js.map")).toBe(false);
 });
