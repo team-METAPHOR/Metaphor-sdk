@@ -1,3 +1,4 @@
+import { type RecentActivity, startActivity } from "./activity";
 import { submitReport, type WidgetConfig } from "./api";
 import { captureViewport } from "./capture";
 import { type Detection, startDetection } from "./detect";
@@ -22,6 +23,7 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
     <h2 id="heading">버그 신고</h2><label for="title">제목</label><input id="title" type="text" maxlength="200">
     <label for="description">설명</label><textarea id="description" required></textarea>
     <label><input id="environment" type="checkbox"> 브라우저 환경 정보 전송에 동의합니다</label>
+    ${config.activity_allowed === true ? '<label><input id="activity" type="checkbox"> 최근 2분의 클릭·화면 이동·안내 문구 전송에 동의합니다</label>' : ""}
     ${config.screenshot_allowed ? '<label><input id="screenshot" type="checkbox"> 마스킹된 스크린샷 전송에 동의합니다</label>' : ""}
     <p role="status" aria-live="polite"></p><div class="actions"><button id="cancel" type="button">취소</button><button id="submit" type="submit">신고 보내기</button></div></form></dialog>`;
   const style = root.querySelector("style");
@@ -35,6 +37,10 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
   const title = root.querySelector("#title");
   const description = root.querySelector("#description");
   const environment = root.querySelector("#environment");
+  const activity = root.querySelector("#activity");
+  let activitySnapshot: RecentActivity | undefined;
+  const collector =
+    config.activity_allowed === true ? startActivity(host, config.mask_selectors) : undefined;
   const screenshot = root.querySelector("#screenshot");
   const screenshotConsent = () =>
     screenshot instanceof HTMLInputElement && screenshot.checked && config.screenshot_allowed;
@@ -106,11 +112,13 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
     );
     if (hint instanceof HTMLElement) hint.hidden = true;
     submit.disabled = false;
+    activitySnapshot = collector?.snapshot();
     dialog.showModal();
   });
   launch.addEventListener("click", () => {
     if (!dialog.open) {
       detection = undefined;
+      activitySnapshot = collector?.snapshot();
       dialog.showModal();
     }
   });
@@ -123,9 +131,11 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
         description: description.value,
         environment: environment.checked,
         screenshot: screenshotConsent(),
+        activity: activity instanceof HTMLInputElement && activity.checked,
       },
       location.href,
       detection,
+      activitySnapshot,
     );
     const signature = JSON.stringify(payload);
     if (payload.title.length > 200 || payload.description.length > description.maxLength) {
@@ -182,6 +192,7 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
     if (result.status === 429) {
       stopDetection();
       stopRage();
+      collector?.stop();
       if (hint instanceof HTMLElement) hint.hidden = true;
       retryAt =
         // Both daily caps reset at UTC midnight (program budget and widget share of it).
@@ -209,9 +220,10 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
         // The customer has not proven ownership of the test origin yet; retrying cannot help.
         "ORIGIN_NOT_VERIFIED",
       ].includes(result.code)
-    )
+    ) {
+      collector?.stop();
       host.remove();
-    else {
+    } else {
       if (result.code === "AUTO_DETECT_DISABLED") {
         stopDetection();
         detection = undefined;

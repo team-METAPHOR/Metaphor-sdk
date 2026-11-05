@@ -1,3 +1,4 @@
+import type { RecentActivity } from "./activity";
 import type { ReportPayload } from "./api";
 import type { Detection } from "./detect";
 import { redactText, sanitizeUrl } from "./privacy";
@@ -7,9 +8,15 @@ export interface Draft {
   readonly description: string;
   readonly environment: boolean;
   readonly screenshot: boolean;
+  readonly activity?: boolean;
 }
 
-export function buildPayload(draft: Draft, href = location.href, detection?: Detection) {
+export function buildPayload(
+  draft: Draft,
+  href = location.href,
+  detection?: Detection,
+  activity?: RecentActivity,
+) {
   const page = sanitizeUrl(href);
   if (page === null) throw new TypeError("Invalid page URL");
   return {
@@ -17,7 +24,12 @@ export function buildPayload(draft: Draft, href = location.href, detection?: Det
     description: redactText(draft.description),
     page_url: page,
     ...(detection ?? { error_type: "manual" as const }),
-    consent: { environment: draft.environment, screenshot: draft.screenshot },
+    consent: {
+      environment: draft.environment,
+      screenshot: draft.screenshot,
+      ...(draft.activity ? { activity: true } : {}),
+    },
+    ...(draft.activity && activity ? { activity } : {}),
     ...(draft.environment
       ? {
           environment: {

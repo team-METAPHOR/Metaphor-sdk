@@ -26,8 +26,8 @@ rename the attributes.
   optional `screenshot` (PNG), optional `Idempotency-Key` header
 - The payload schema is a whitelist; unknown fields are rejected (422). Keep TS types in
   `src/api.ts` identical to the doc.
-- Breadcrumbs (user click/navigation history) are **on hold** for security review. Do not
-  collect or send them until the backend contract adds them.
+- Recent click/navigation context follows backend docs/api/widget-sdk.md. Collect only when
+  `activity_allowed` is true; send only with separate `consent.activity`. Never collect values.
 
 ## 3. Hard rules (security and host safety)
 

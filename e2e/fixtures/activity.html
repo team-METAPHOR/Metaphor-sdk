@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>Activity shop</title>
+    <script src="/sdk/metaphor.js" data-metaphor-project-key="mpk_test" data-metaphor-api-base="http://api.test" defer></script>
+  </head>
+  <body>
+    <button data-testid="add-to-cart" type="button" onclick="history.pushState({}, '', '/cart'); document.querySelector('#notice').textContent='담기 완료'">장바구니 담기</button>
+    <button data-testid="increase" type="button" onclick="document.querySelector('#notice').textContent='수량 확인 완료'">수량 늘리기</button>
+    <p id="notice" role="status"></p>
+  </body>
+</html>
