@@ -10,13 +10,17 @@ declare global {
 }
 
 export async function boot(script: HTMLScriptElement | null): Promise<void> {
-  if (window.__metaphorLoaded) return;
-  window.__metaphorLoaded = true;
-  const settings = readScriptConfig(script);
-  if (!settings) return;
-  const config = await fetchConfig(settings);
-  if (!config?.widget_enabled || !config.reporting_enabled) return;
-  mountWidget(settings, config);
+  try {
+    if (window.__metaphorLoaded) return;
+    window.__metaphorLoaded = true;
+    const settings = readScriptConfig(script);
+    if (!settings) return;
+    const config = await fetchConfig(settings);
+    if (!config?.widget_enabled || !config.reporting_enabled) return;
+    mountWidget(settings, config);
+  } catch {
+    return;
+  }
 }
 
-boot(document.currentScript as HTMLScriptElement | null).catch(() => {});
+boot(document.currentScript instanceof HTMLScriptElement ? document.currentScript : null);

@@ -1,6 +1,7 @@
 import { submitReport, type WidgetConfig } from "./api";
 import { captureViewport } from "./capture";
 import { type Detection, startDetection } from "./detect";
+import { startRageDetection } from "./rage";
 import { buildPayload } from "./report";
 import type { ScriptConfig } from "./script-config";
 
@@ -8,18 +9,25 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
   const host = document.createElement("div");
   const root = host.attachShadow({ mode: "open" });
   root.innerHTML = `<style>
-    :host{all:initial;font-family:system-ui,sans-serif;color-scheme:light;color:#172033}
-    *{box-sizing:border-box}button,input,textarea{font:inherit}button{cursor:pointer;min-height:44px;border:1px solid #cbd5e1;border-radius:10px;padding:10px 16px;background:white;color:#172033}
-    button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid #2563eb;outline-offset:3px}
-    #launch{position:fixed;right:20px;bottom:20px;z-index:2147483647;background:#172033;color:white;box-shadow:0 4px 20px #0003}
-    dialog{position:fixed;margin:auto;width:min(440px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;border:1px solid #cbd5e1;border-radius:16px;padding:24px;background:white;color:#172033;box-shadow:0 12px 48px #0004}
-    dialog::backdrop{background:#0005}h2{margin:0 0 20px;font-size:22px}label{display:block;margin:14px 0 6px}input[type=text],textarea{width:100%;border:1px solid #94a3b8;border-radius:8px;padding:10px}textarea{min-height:120px;resize:vertical}.actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}#submit{background:#172033;color:white}p{line-height:1.5}input[type=checkbox]{width:18px;height:18px;vertical-align:middle}button:disabled{opacity:.5;cursor:wait}
-    </style><button id="launch" type="button">버그 신고</button><button id="hint" type="button" hidden style="position:fixed;bottom:76px;right:20px;z-index:2147483647;max-width:calc(100vw - 40px)">오류가 감지되었습니다. 신고하기</button><dialog aria-labelledby="heading"><form>
+    :host{all:initial;--surface:#fff;--ink:#172033;--edge:#64748b;--focus:#2563eb;--space1:8px;--space2:16px;--space3:24px;--float-gap:20px;--radius-field:8px;--radius-button:10px;--radius-dialog:16px;--control-height:44px;--field-padding:10px;--panel-width:440px;--viewport-gap:32px;--focus-width:3px;--focus-offset:3px;--border-width:1px;--text-size:16px;--heading-size:22px;--line-height:1.5;--textarea-height:120px;--checkbox-size:18px;--layer:2147483647;--shadow-float:0 4px 20px #0003;--shadow-dialog:0 12px 48px #0004;--backdrop:#0005;font:var(--text-size)/var(--line-height) system-ui,sans-serif;color-scheme:light;color:var(--ink)}
+    @media(prefers-color-scheme:dark){:host{--surface:#111827;--ink:#f1f5f9;--edge:#94a3b8;--focus:#60a5fa;color-scheme:dark}}
+    *{box-sizing:border-box}button,input,textarea{font:inherit}button{cursor:pointer;min-height:var(--control-height);border:var(--border-width) solid var(--edge);border-radius:var(--radius-button);padding:var(--field-padding) var(--space2);background:var(--surface);color:var(--ink)}
+    button:focus-visible,input:focus-visible,textarea:focus-visible{outline:var(--focus-width) solid var(--focus);outline-offset:var(--focus-offset)}
+    button:hover{filter:brightness(.92)}button:active{filter:brightness(.85)}
+    #launch{position:fixed;right:var(--float-gap);bottom:var(--float-gap);z-index:var(--layer);background:var(--ink);color:var(--surface);box-shadow:var(--shadow-float)}
+    dialog{position:fixed;margin:auto;width:min(var(--panel-width),calc(100vw - var(--viewport-gap)));max-height:calc(100dvh - var(--viewport-gap));overflow:auto;border:var(--border-width) solid var(--edge);border-radius:var(--radius-dialog);padding:var(--space3);background:var(--surface);color:var(--ink);box-shadow:var(--shadow-dialog)}
+    dialog::backdrop{background:var(--backdrop)}h2{margin:0 0 var(--space3);font-size:var(--heading-size)}label{display:block;margin:var(--space2) 0 var(--space1);word-break:keep-all;overflow-wrap:anywhere}label:has(input[type=checkbox]){display:flex;align-items:center;gap:var(--space1);min-height:var(--control-height)}input[type=text],textarea{width:100%;border:var(--border-width) solid var(--edge);border-radius:var(--radius-field);padding:var(--field-padding);background:var(--surface);color:var(--ink)}textarea{min-height:var(--textarea-height);resize:vertical}.actions{display:flex;flex-wrap:wrap;gap:var(--space1);justify-content:flex-end;margin-top:var(--space3)}#submit{background:var(--ink);color:var(--surface)}p{line-height:var(--line-height);overflow-wrap:anywhere}input[type=checkbox]{width:var(--checkbox-size);height:var(--checkbox-size);flex-shrink:0;accent-color:var(--focus)}button:disabled{background:var(--edge);color:var(--surface);cursor:default}#hint{position:fixed;bottom:calc(var(--float-gap) + var(--control-height) + var(--space3));right:var(--float-gap);z-index:var(--layer);max-width:calc(100vw - 2 * var(--float-gap))}
+    </style><button id="launch" type="button">버그 신고</button><button id="hint" type="button" hidden>오류가 감지되었습니다. 신고하기</button><dialog aria-labelledby="heading"><form>
     <h2 id="heading">버그 신고</h2><label for="title">제목</label><input id="title" type="text" maxlength="200">
     <label for="description">설명</label><textarea id="description" required></textarea>
     <label><input id="environment" type="checkbox"> 브라우저 환경 정보 전송에 동의합니다</label>
     ${config.screenshot_allowed ? '<label><input id="screenshot" type="checkbox"> 마스킹된 스크린샷 전송에 동의합니다</label>' : ""}
     <p role="status" aria-live="polite"></p><div class="actions"><button id="cancel" type="button">취소</button><button id="submit" type="submit">신고 보내기</button></div></form></dialog>`;
+  const style = root.querySelector("style");
+  const sheet = new CSSStyleSheet();
+  sheet.replaceSync(style?.textContent ?? "");
+  style?.remove();
+  root.adoptedStyleSheets = [sheet];
   const launch = root.querySelector("#launch");
   const dialog = root.querySelector("dialog");
   const form = root.querySelector("form");
@@ -43,6 +51,25 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
   )
     return;
   description.maxLength = Math.min(8000, config.limits.max_description);
+  dialog.addEventListener("keydown", (event) => {
+    if (event.key !== "Tab") return;
+    const controls = [...form.querySelectorAll("input,textarea,button")].filter(
+      (element) =>
+        (element instanceof HTMLInputElement ||
+          element instanceof HTMLTextAreaElement ||
+          element instanceof HTMLButtonElement) &&
+        !element.disabled,
+    );
+    const first = controls[0];
+    const last = controls.at(-1);
+    if (event.shiftKey && root.activeElement === first && last instanceof HTMLElement) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && root.activeElement === last && first instanceof HTMLElement) {
+      event.preventDefault();
+      first.focus();
+    }
+  });
   screenshot?.addEventListener("change", () => {
     description.required = !screenshotConsent();
   });
@@ -53,16 +80,28 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
   let detection: Detection | undefined;
   const hint = root.querySelector("#hint");
   let suggested: Detection | undefined;
-  const stopDetection = startDetection(config, settings.apiBase, (value) => {
-    if (dialog.open || !host.isConnected) return;
+  let nextHint = 0;
+  const offer = (value?: Detection) => {
+    if (dialog.open || !host.isConnected || Date.now() < nextHint) return;
+    nextHint = Date.now() + 60000;
     suggested = value;
-    if (hint instanceof HTMLElement) hint.hidden = false;
-  });
+    if (hint instanceof HTMLElement) {
+      hint.textContent = value ? "오류가 감지되었습니다. 신고하기" : "반응이 없나요? 버그 신고하기";
+      hint.hidden = false;
+    }
+  };
+  const stopDetection = startDetection(config, settings.apiBase, offer);
+  const stopRage = config.auto_detect.enabled
+    ? startRageDetection(host, () => offer())
+    : () => undefined;
   hint?.addEventListener("click", () => {
     if (dialog.open) return;
     detection = suggested;
-    title.value = "감지된 오류 신고";
-    description.value = suggested?.error.message ?? "";
+    title.value = suggested ? "감지된 오류 신고" : "반응 없는 요소 신고";
+    description.value = (suggested?.error.message ?? "요소를 눌러도 반응이 없습니다.").slice(
+      0,
+      description.maxLength,
+    );
     if (hint instanceof HTMLElement) hint.hidden = true;
     submit.disabled = false;
     dialog.showModal();
@@ -87,6 +126,10 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
       detection,
     );
     const signature = JSON.stringify(payload);
+    if (payload.title.length > 200 || payload.description.length > description.maxLength) {
+      status.textContent = "입력 가능한 글자 수를 초과했습니다.";
+      return;
+    }
     if (new Blob([signature]).size > 32768 || payload.page_url.length > 2048) {
       status.textContent = "내용이 너무 깁니다. 설명을 줄여 주세요.";
       return;
@@ -136,6 +179,7 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
     }
     if (result.status === 429) {
       stopDetection();
+      stopRage();
       if (hint instanceof HTMLElement) hint.hidden = true;
       retryAt =
         result.code === "DAILY_LIMIT_EXCEEDED"

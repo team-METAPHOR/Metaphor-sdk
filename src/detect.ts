@@ -1,12 +1,9 @@
-import type { WidgetConfig } from "./api";
+import type { AutomaticReport, HttpMethod, WidgetConfig } from "./api";
 
-export interface Detection {
-  readonly error_type: "js_error" | "unhandled_rejection" | "http_5xx";
-  readonly error: {
-    readonly message: string;
-    readonly stack_top?: string;
-    readonly http?: { readonly method: string; readonly path: string; readonly status: number };
-  };
+export type Detection = AutomaticReport;
+
+function isHttpMethod(method: string): method is HttpMethod {
+  return ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"].includes(method);
 }
 
 export function safeError(reason: unknown): string {
@@ -30,12 +27,7 @@ export function httpFailure(info: {
   readonly status: number;
 }): Detection | null {
   const method = info.method.toUpperCase();
-  if (
-    info.status < 500 ||
-    info.status > 599 ||
-    !["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"].includes(method)
-  )
-    return null;
+  if (info.status < 500 || info.status > 599 || !isHttpMethod(method)) return null;
   try {
     const path = new URL(info.url).pathname;
     if (path.length > 2048) return null;
@@ -76,10 +68,10 @@ export function startDetection(
         if (event.filename) {
           const source = new URL(event.filename, location.href);
           if (source.pathname.endsWith("/metaphor.js")) return;
-          stack_top = `${source.origin}${source.pathname}:${event.lineno}:${event.colno}`.slice(
-            0,
-            300,
-          );
+          if (source.protocol === "https:" || source.protocol === "http:") {
+            const suffix = `:${event.lineno}:${event.colno}`;
+            stack_top = `${`${source.origin}${source.pathname}`.slice(0, 300 - suffix.length)}${suffix}`;
+          }
         }
         prompt({
           error_type: "js_error",
@@ -158,7 +150,8 @@ export function startDetection(
                 const info = requests.get(receiver);
                 if (info) observe(info.method, info.href, receiver.status);
               });
-            requests.set(receiver, { method, href: String(href) });
+            const address = new URL(String(href), location.href);
+            requests.set(receiver, { method, href: `${address.origin}${address.pathname}` });
           }
         }
         return result;
