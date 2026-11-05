@@ -6,6 +6,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function isOpaque(segment: string): boolean {
   if (segment.length > 64 || UUID.test(segment) || /^[0-9a-f]{16,}$/i.test(segment)) return true;
+  // Personal data in paths: emails, phone/account-like numbers, names in non-ASCII scripts.
+  if (/@|\d{6}|\P{ASCII}/u.test(segment)) return true;
   const parts = segment.split(".");
   if (parts.length >= 2 && parts.every((part) => part.length >= 8 && TOKEN_CHARS.test(part)))
     return true;

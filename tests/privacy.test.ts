@@ -41,6 +41,16 @@ describe("sanitizeUrl", () => {
     ["https://shop.test/d/k3y%2DAb3dEf6hIj9kLm2nOp5q", "https://shop.test/d/:redacted"],
     ["https://shop.test/d/%E0%A4%A", "https://shop.test/d/:redacted"],
     ["https://shop.test/cart;jsessionid=ABC123/view", "https://shop.test/cart/view"],
+    ["https://shop.test/users/kim@example.com", "https://shop.test/users/:redacted"],
+    ["https://shop.test/users/kim%40example.com", "https://shop.test/users/:redacted"],
+    ["https://shop.test/orders/1234567", "https://shop.test/orders/:redacted"],
+    ["https://shop.test/call/010-1234-5678", "https://shop.test/call/010-1234-5678"],
+    ["https://shop.test/acct/no123456", "https://shop.test/acct/:redacted"],
+    ["https://shop.test/products/1", "https://shop.test/products/1"],
+    ["https://shop.test/products/12345", "https://shop.test/products/12345"],
+    ["https://shop.test/p/0123456789abcdef", "https://shop.test/p/:redacted"],
+    ["https://shop.test/u/%ED%99%8D%EA%B8%B8%EB%8F%99", "https://shop.test/u/:redacted"],
+    ["https://shop.test/café", "https://shop.test/:redacted"],
   ])("%s", (input, expected) => {
     expect(sanitizeUrl(input)).toBe(expected);
   });
