@@ -3,7 +3,7 @@ import { sanitizePath, sanitizeUrl } from "./privacy";
 
 export type Detection = AutomaticReport;
 
-function isHttpMethod(method: string): method is HttpMethod {
+export function isHttpMethod(method: string): method is HttpMethod {
   return ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"].includes(method);
 }
 
@@ -107,9 +107,8 @@ export function startDetection(
       }
     });
   if (config.auto_detect.http_5xx) {
-    const observe = (method: string, href: string, status: number) => {
+    const observe = (method: string, target: URL, status: number) => {
       try {
-        const target = new URL(href, location.href);
         const api = new URL(apiBase);
         if (
           target.origin === api.origin &&
@@ -122,42 +121,79 @@ export function startDetection(
         return;
       }
     };
-    window.fetch = new Proxy(window.fetch, {
-      apply(target, receiver, args) {
-        const response: Promise<Response> = Reflect.apply(target, receiver, args);
-        return response.then((value) => {
-          try {
-            const input: unknown = args[0];
-            const init: unknown = args[1];
-            const method =
-              typeof init === "object" &&
-              init !== null &&
-              "method" in init &&
-              typeof init.method === "string"
-                ? init.method
-                : input instanceof Request
-                  ? input.method
-                  : "GET";
-            const href =
-              input instanceof Request
-                ? input.url
-                : input instanceof URL
-                  ? input.href
-                  : typeof input === "string"
-                    ? input
-                    : "";
-            observe(method, href, value.status);
-          } catch {
-            return value;
-          }
+    watchRequests(observe);
+  }
+  return () => {
+    enabled = false;
+  };
+}
+
+export type RequestListener = (method: string, url: URL, status: number, ms: number) => void;
+const listeners: RequestListener[] = [];
+
+/** Patches fetch/XHR once and reports each completion (status 0 = network failure). */
+export function watchRequests(listener: RequestListener) {
+  listeners.push(listener);
+  if (listeners.length > 1) return;
+  const notify = (method: string, href: string, status: number, started: number) => {
+    try {
+      const url = new URL(href, location.href);
+      for (const each of listeners)
+        try {
+          each(method, url, status, Date.now() - started);
+        } catch {
+          // A failing listener never breaks the host request.
+        }
+    } catch {
+      return;
+    }
+  };
+  window.fetch = new Proxy(window.fetch, {
+    apply(target, receiver, args) {
+      const started = Date.now();
+      const response: Promise<Response> = Reflect.apply(target, receiver, args);
+      let method = "GET";
+      let href = "";
+      try {
+        const input: unknown = args[0];
+        const init: unknown = args[1];
+        method =
+          typeof init === "object" &&
+          init !== null &&
+          "method" in init &&
+          typeof init.method === "string"
+            ? init.method
+            : input instanceof Request
+              ? input.method
+              : "GET";
+        href =
+          input instanceof Request
+            ? input.url
+            : input instanceof URL
+              ? input.href
+              : typeof input === "string"
+                ? input
+                : "";
+      } catch {
+        return response;
+      }
+      return response.then(
+        (value) => {
+          notify(method, href, value.status, started);
           return value;
-        });
-      },
-    });
-    const requests = new WeakMap<XMLHttpRequest, { method: string; href: string }>();
-    XMLHttpRequest.prototype.open = new Proxy(XMLHttpRequest.prototype.open, {
-      apply(target, receiver, args) {
-        const result: unknown = Reflect.apply(target, receiver, args);
+        },
+        (error: unknown) => {
+          notify(method, href, 0, started);
+          throw error;
+        },
+      );
+    },
+  });
+  const requests = new WeakMap<XMLHttpRequest, { method: string; href: string; started: number }>();
+  XMLHttpRequest.prototype.open = new Proxy(XMLHttpRequest.prototype.open, {
+    apply(target, receiver, args) {
+      const result: unknown = Reflect.apply(target, receiver, args);
+      try {
         if (receiver instanceof XMLHttpRequest) {
           const method: unknown = args[0];
           const href: unknown = args[1];
@@ -165,17 +201,20 @@ export function startDetection(
             if (!requests.has(receiver))
               receiver.addEventListener("loadend", () => {
                 const info = requests.get(receiver);
-                if (info) observe(info.method, info.href, receiver.status);
+                if (info) notify(info.method, info.href, receiver.status, info.started);
               });
             const address = new URL(String(href), location.href);
-            requests.set(receiver, { method, href: sanitizeUrl(address.href) ?? "" });
+            requests.set(receiver, {
+              method,
+              href: sanitizeUrl(address.href) ?? "",
+              started: Date.now(),
+            });
           }
         }
+      } catch {
         return result;
-      },
-    });
-  }
-  return () => {
-    enabled = false;
-  };
+      }
+      return result;
+    },
+  });
 }
