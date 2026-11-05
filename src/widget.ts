@@ -1,4 +1,5 @@
 import { submitReport, type WidgetConfig } from "./api";
+import { captureViewport } from "./capture";
 import { buildPayload } from "./report";
 import type { ScriptConfig } from "./script-config";
 
@@ -16,6 +17,7 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
     <h2 id="heading">버그 신고</h2><label for="title">제목</label><input id="title" type="text" maxlength="200">
     <label for="description">설명</label><textarea id="description" required></textarea>
     <label><input id="environment" type="checkbox"> 브라우저 환경 정보 전송에 동의합니다</label>
+    ${config.screenshot_allowed ? '<label><input id="screenshot" type="checkbox"> 마스킹된 스크린샷 전송에 동의합니다</label>' : ""}
     <p role="status" aria-live="polite"></p><div class="actions"><button id="cancel" type="button">취소</button><button id="submit" type="submit">신고 보내기</button></div></form></dialog>`;
   const launch = root.querySelector("#launch");
   const dialog = root.querySelector("dialog");
@@ -23,6 +25,9 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
   const title = root.querySelector("#title");
   const description = root.querySelector("#description");
   const environment = root.querySelector("#environment");
+  const screenshot = root.querySelector("#screenshot");
+  const screenshotConsent = () =>
+    screenshot instanceof HTMLInputElement && screenshot.checked && config.screenshot_allowed;
   const submit = root.querySelector("#submit");
   const status = root.querySelector("[role=status]");
   if (
@@ -37,6 +42,9 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
   )
     return;
   description.maxLength = Math.min(8000, config.limits.max_description);
+  screenshot?.addEventListener("change", () => {
+    description.required = !screenshotConsent();
+  });
   let pending: { signature: string; key: string; form: FormData } | undefined;
   let retryAt = 0;
   let attempts = 0;
@@ -50,7 +58,7 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
       title: title.value,
       description: description.value,
       environment: environment.checked,
-      screenshot: false,
+      screenshot: screenshotConsent(),
     });
     const signature = JSON.stringify(payload);
     if (new Blob([signature]).size > 32768 || payload.page_url.length > 2048) {
@@ -58,7 +66,23 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
       return;
     }
     if (!pending || pending.signature !== signature) {
+      if (!payload.description.trim() && !screenshotConsent()) {
+        status.textContent = "설명을 입력해 주세요.";
+        return;
+      }
+      submit.disabled = true;
       const body = new FormData();
+      if (screenshotConsent()) {
+        status.textContent = "민감한 정보를 가린 스크린샷을 준비하는 중…";
+        try {
+          body.append("screenshot", await captureViewport(config, host), "screenshot.png");
+        } catch {
+          status.textContent =
+            "스크린샷을 준비하지 못했습니다. 동의를 해제하고 설명으로 신고해 주세요.";
+          submit.disabled = false;
+          return;
+        }
+      }
       body.append("payload", signature);
       pending = {
         signature,
