@@ -15,6 +15,14 @@ test("loads from the script tag and fetches config without cookies", async ({ pa
   });
 });
 
+test("loads only once when the script is embedded twice", async ({ page }) => {
+  const requests = await mockWidget(page);
+  await page.goto(SITE);
+  await page.addScriptTag({ url: `${SITE}/sdk/metaphor.js` });
+  await expect(page.getByRole("button", { name: "버그 신고", exact: true })).toHaveCount(1);
+  expect(requests).toHaveLength(1);
+});
+
 test("stays inert when the widget is disabled", async ({ page }) => {
   await mockWidget(page, { ...defaultConfig(), widget_enabled: false });
   const errors: string[] = [];

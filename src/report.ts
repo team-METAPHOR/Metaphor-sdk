@@ -1,3 +1,7 @@
+import type { ReportPayload } from "./api";
+import type { Detection } from "./detect";
+import { redactText } from "./privacy";
+
 export interface Draft {
   readonly title: string;
   readonly description: string;
@@ -10,8 +14,8 @@ export function buildPayload(draft: Draft, href = location.href, detection?: Det
   page.search = "";
   page.hash = "";
   return {
-    title: draft.title,
-    description: draft.description,
+    title: redactText(draft.title),
+    description: redactText(draft.description),
     page_url: page.href,
     ...(detection ?? { error_type: "manual" as const }),
     consent: { environment: draft.environment, screenshot: draft.screenshot },
@@ -28,7 +32,5 @@ export function buildPayload(draft: Draft, href = location.href, detection?: Det
           },
         }
       : {}),
-  };
+  } satisfies ReportPayload;
 }
-
-import type { Detection } from "./detect";

@@ -54,7 +54,11 @@ export async function mockWidget(page: Page, config = defaultConfig()): Promise<
     if (request.method() === "OPTIONS") {
       return route.fulfill({
         status: 204,
-        headers: { ...cors, "access-control-allow-headers": "Idempotency-Key" },
+        headers: {
+          ...cors,
+          "access-control-allow-headers": "Content-Type, Idempotency-Key",
+          "access-control-allow-methods": "GET, POST",
+        },
       });
     }
     requests.push({

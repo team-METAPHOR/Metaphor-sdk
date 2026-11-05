@@ -1,3 +1,4 @@
+import { writeFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import { defaultConfig, mockWidget, SITE } from "./mock";
 
@@ -7,8 +8,14 @@ test("uploads only a masked PNG and leaves the host inputs untouched", async ({
   const requests = await mockWidget(page);
   await page.goto(SITE);
   await page.locator("input[name=email]").fill("private@example.com");
-  const rect = await page.locator("[data-private]").boundingBox();
-  if (!rect) throw new Error("private fixture missing");
+  const points = await page.evaluate(() =>
+    [
+      ...document.querySelectorAll("[data-private], input, textarea, select, [contenteditable]"),
+    ].map((element) => {
+      const rect = element.getBoundingClientRect();
+      return { x: Math.floor(rect.x + 5), y: Math.floor(rect.y + 5) };
+    }),
+  );
   await page.getByRole("button", { name: "버그 신고", exact: true }).click();
   await page.getByLabel("마스킹된 스크린샷 전송에 동의합니다").check();
   await page.getByRole("button", { name: "신고 보내기" }).click();
@@ -19,12 +26,13 @@ test("uploads only a masked PNG and leaves the host inputs untouched", async ({
   const start = data.indexOf(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
   expect(start).toBeGreaterThan(0);
   const end = data.indexOf(Buffer.from([73, 69, 78, 68]), start) + 8;
+  await writeFile(testInfo.outputPath("masked-viewport.png"), data.subarray(start, end));
   await testInfo.attach("masked-viewport", {
     body: data.subarray(start, end),
     contentType: "image/png",
   });
   const pixels = await page.evaluate(
-    async ({ png, x, y }) => {
+    async ({ png, points }) => {
       const image = new Image();
       image.src = `data:image/png;base64,${png}`;
       await image.decode();
@@ -34,15 +42,15 @@ test("uploads only a masked PNG and leaves the host inputs untouched", async ({
       const context = canvas.getContext("2d");
       if (!context) throw new Error("canvas missing");
       context.drawImage(image, 0, 0);
-      return [...context.getImageData(x, y, 1, 1).data];
+      return points.map(({ x, y }) => [...context.getImageData(x, y, 1, 1).data]);
     },
     {
       png: data.subarray(start, end).toString("base64"),
-      x: Math.floor(rect.x + 10),
-      y: Math.floor(rect.y + 5),
+      points,
     },
   );
-  expect(pixels).toEqual([0, 0, 0, 255]);
+  expect(pixels).toHaveLength(6);
+  for (const pixel of pixels) expect(pixel).toEqual([0, 0, 0, 255]);
   expect(data.toString()).toContain('"screenshot":true');
   await expect(page.locator("input[name=email]")).toHaveValue("private@example.com");
 });

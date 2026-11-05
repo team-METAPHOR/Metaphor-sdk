@@ -51,6 +51,39 @@ test("does not mount or submit when reporting is disabled", async ({ page }) => 
   expect(requests.filter((r) => r.method === "POST")).toHaveLength(0);
 });
 
+test("changed content gets a fresh submission key", async ({ page }) => {
+  await page.clock.install();
+  await mockWidget(page);
+  const keys: (string | undefined)[] = [];
+  await page.route(`${API}/api/v1/widget/reports?**`, async (route) => {
+    if (route.request().method() === "OPTIONS")
+      return route.fulfill({
+        status: 204,
+        headers: {
+          "access-control-allow-origin": SITE,
+          "access-control-allow-headers": "Idempotency-Key",
+          "access-control-allow-methods": "POST",
+        },
+      });
+    keys.push(route.request().headers()["idempotency-key"]);
+    return route.fulfill({
+      status: 503,
+      headers: { "access-control-allow-origin": SITE },
+      json: { error: { code: "WIDGET_UNAVAILABLE" } },
+    });
+  });
+  await page.goto(SITE);
+  await page.getByRole("button", { name: "버그 신고", exact: true }).click();
+  await page.getByLabel("설명", { exact: true }).fill("첫 설명");
+  await page.getByRole("button", { name: "신고 보내기" }).click();
+  await expect(page.getByRole("status")).toContainText("전송하지 못했습니다");
+  await page.getByLabel("설명", { exact: true }).fill("바꾼 설명");
+  await page.clock.fastForward(32000);
+  await page.getByRole("button", { name: "신고 보내기" }).click();
+  await expect.poll(() => keys.length).toBe(2);
+  expect(keys[0]).not.toBe(keys[1]);
+});
+
 test("retries the same submission with the same key after backoff", async ({ page }) => {
   await page.clock.install();
   await mockWidget(page);

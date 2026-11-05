@@ -1,6 +1,34 @@
 /** Client for the backend widget API (Metaphor-back docs/api/widget-sdk.md). No cookies, ever. */
 import type { ScriptConfig } from "./script-config";
 
+export type HttpMethod = "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
+export type ReportError = { readonly message: string; readonly stack_top?: string };
+export type AutomaticReport =
+  | { readonly error_type: "js_error" | "unhandled_rejection"; readonly error: ReportError }
+  | {
+      readonly error_type: "http_5xx";
+      readonly error: ReportError & {
+        readonly http: {
+          readonly method: HttpMethod;
+          readonly path: string;
+          readonly status: number;
+        };
+      };
+    };
+export type ReportPayload = {
+  readonly title?: string;
+  readonly description?: string;
+  readonly page_url: string;
+  readonly consent?: { readonly environment?: boolean; readonly screenshot?: boolean };
+  readonly environment?: {
+    readonly user_agent?: string;
+    readonly language?: string;
+    readonly timezone?: string;
+    readonly viewport?: { readonly width: number; readonly height: number };
+  };
+  readonly mask_boxes?: readonly (readonly [number, number, number, number])[];
+} & ({ readonly error_type: "manual"; readonly error?: never } | AutomaticReport);
+
 export interface WidgetConfig {
   widget_enabled: boolean;
   reporting_enabled: boolean;
@@ -28,7 +56,21 @@ export async function submitReport(config: ScriptConfig, form: FormData, key: st
       headers: { "Idempotency-Key": key },
       signal: AbortSignal.timeout(15000),
     });
-    const body: unknown = await response.json();
+    const body: unknown = await response.json().catch(() => null);
+    if (
+      response.ok &&
+      !(
+        typeof body === "object" &&
+        body !== null &&
+        "status" in body &&
+        ((body.status === "received" &&
+          "receipt_id" in body &&
+          typeof body.receipt_id === "string" &&
+          body.receipt_id.length > 0) ||
+          (body.status === "duplicate" && "receipt_id" in body && body.receipt_id === null))
+      )
+    )
+      return { status: 502, code: "INVALID_RESPONSE" };
     if (typeof body !== "object" || body === null)
       return { status: response.status, code: "INVALID_RESPONSE" };
     return {
