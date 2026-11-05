@@ -14,6 +14,7 @@ export interface RecordedRequest {
   cookie: string | null;
   contentType: string | null;
   body: Buffer | null;
+  idempotencyKey: string | null;
 }
 
 export function defaultConfig() {
@@ -63,6 +64,7 @@ export async function mockWidget(page: Page, config = defaultConfig()): Promise<
       cookie: headers.cookie ?? null,
       contentType: headers["content-type"] ?? null,
       body: request.postDataBuffer(),
+      idempotencyKey: headers["idempotency-key"] ?? null,
     });
     if (url.pathname === "/api/v1/widget/config")
       return route.fulfill({ headers: cors, json: config });
