@@ -1,6 +1,6 @@
 import type { ReportPayload } from "./api";
 import type { Detection } from "./detect";
-import { redactText } from "./privacy";
+import { redactText, sanitizeUrl } from "./privacy";
 
 export interface Draft {
   readonly title: string;
@@ -10,13 +10,12 @@ export interface Draft {
 }
 
 export function buildPayload(draft: Draft, href = location.href, detection?: Detection) {
-  const page = new URL(href);
-  page.search = "";
-  page.hash = "";
+  const page = sanitizeUrl(href);
+  if (page === null) throw new TypeError("Invalid page URL");
   return {
     title: redactText(draft.title),
     description: redactText(draft.description),
-    page_url: page.href,
+    page_url: page,
     ...(detection ?? { error_type: "manual" as const }),
     consent: { environment: draft.environment, screenshot: draft.screenshot },
     ...(draft.environment

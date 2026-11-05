@@ -1,4 +1,5 @@
 import type { AutomaticReport, HttpMethod, WidgetConfig } from "./api";
+import { sanitizePath, sanitizeUrl } from "./privacy";
 
 export type Detection = AutomaticReport;
 
@@ -29,7 +30,7 @@ export function httpFailure(info: {
   const method = info.method.toUpperCase();
   if (info.status < 500 || info.status > 599 || !isHttpMethod(method)) return null;
   try {
-    const path = new URL(info.url).pathname;
+    const path = sanitizePath(new URL(info.url).pathname);
     if (path.length > 2048) return null;
     return {
       error_type: "http_5xx",
@@ -38,6 +39,18 @@ export function httpFailure(info: {
   } catch {
     return null;
   }
+}
+
+export function stackTop(
+  filename: string,
+  lineno: number,
+  colno: number,
+  base: string,
+): string | undefined {
+  const source = new URL(filename, base);
+  if (source.protocol !== "https:" && source.protocol !== "http:") return undefined;
+  const suffix = `:${lineno}:${colno}`;
+  return `${(sanitizeUrl(source.href) ?? "").slice(0, 300 - suffix.length)}${suffix}`;
 }
 
 export function startDetection(
@@ -68,10 +81,7 @@ export function startDetection(
         if (event.filename) {
           const source = new URL(event.filename, location.href);
           if (source.pathname.endsWith("/metaphor.js")) return;
-          if (source.protocol === "https:" || source.protocol === "http:") {
-            const suffix = `:${event.lineno}:${event.colno}`;
-            stack_top = `${`${source.origin}${source.pathname}`.slice(0, 300 - suffix.length)}${suffix}`;
-          }
+          stack_top = stackTop(event.filename, event.lineno, event.colno, location.href);
         }
         prompt({
           error_type: "js_error",
@@ -151,7 +161,7 @@ export function startDetection(
                 if (info) observe(info.method, info.href, receiver.status);
               });
             const address = new URL(String(href), location.href);
-            requests.set(receiver, { method, href: `${address.origin}${address.pathname}` });
+            requests.set(receiver, { method, href: sanitizeUrl(address.href) ?? "" });
           }
         }
         return result;

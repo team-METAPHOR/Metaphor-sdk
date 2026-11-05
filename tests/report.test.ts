@@ -15,3 +15,11 @@ it("omits environment without consent and removes URL queries and fragments", ()
     consent: { environment: false, screenshot: false },
   });
 });
+
+it("redacts credential path segments from page_url", () => {
+  const payload = buildPayload(
+    { title: "버그", description: "설명", environment: false, screenshot: false },
+    "https://shop.test/reset/opaque-reset-credential-0123456789?x=1",
+  );
+  expect(payload.page_url).toBe("https://shop.test/reset/:redacted");
+});
