@@ -81,5 +81,5 @@ embeds the SDK via `METAPHOR_SDK_URL` / `METAPHOR_API_URL` / `METAPHOR_PROJECT_K
   `test`. PR body in Korean: `## 변경 사항` / `## 테스트` / `## 스택`.
 - Commits: Conventional Commits, English, imperative, ≤ 72 chars.
 - No AI attribution in commits or PRs (no `Co-Authored-By`, no "Generated with").
-- TDD: failing test first (unit or harness e2e), then the code. `npm run check` and
+- TDD: failing test first (unit or Playwright e2e), then the code. `npm run check` and
   `npm run e2e` pass before pushing.
