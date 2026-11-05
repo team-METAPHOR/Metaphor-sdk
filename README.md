@@ -17,11 +17,10 @@
 npm ci
 npx playwright install chromium --only-shell
 npm run check     # lint, 타입, 유닛 테스트, 빌드, 번들 크기(50 KiB gzip)
-npm run e2e       # 하네스(가짜 고객사 페이지 + mock API)에서 Playwright
-npm run harness   # 직접 확인: http://localhost:4100
+npm run e2e       # Playwright (테스트 페이지와 mock API를 route로 가로챔, 서버 불필요)
 ```
 
-실제 로컬 백엔드에 붙이려면 `METAPHOR_API_BASE=http://localhost:8000 METAPHOR_PROJECT_KEY=mpk_... npm run harness`를 실행하세요. 이때 백엔드 위젯 설정의 허용 origin에 `http://localhost:4100`을 등록해야 합니다.
+실제 백엔드와 함께 확인할 때는 SDK가 연동된 데모 사이트 `BugLab-shop`을 사용합니다.
 
 ## 현재 상태
 

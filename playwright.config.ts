@@ -1,14 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 
+// No web servers: e2e/mock.ts serves the fixture site and mock API via route interception.
 export default defineConfig({
   testDir: "e2e",
-  fullyParallel: false,
-  workers: 1,
-  use: { baseURL: "http://localhost:4100", trace: "retain-on-failure" },
+  use: { trace: "retain-on-failure" },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
-  webServer: {
-    command: "npm run build && npm run harness",
-    url: "http://localhost:4100",
-    reuseExistingServer: !process.env.CI,
-  },
 });
