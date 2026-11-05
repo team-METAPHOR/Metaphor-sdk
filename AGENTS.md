@@ -36,11 +36,15 @@ rename the attributes.
 - Screenshots: mask before capture. Black out every element matching `mask_selectors` plus all
   `input`, `textarea`, `select`, `[contenteditable]` values in the cloned DOM, then render. Only
   the masked image is uploaded. If a selector throws, abort the capture.
-- Send a screenshot or environment data only with the user's explicit consent in the report UI
-  (`consent.screenshot`, `consent.environment`).
+- Send a screenshot or environment data only with the user's explicit consent: a checkbox in the
+  report UI, or consent the host site collected itself (e.g. at signup) and put in
+  `window.metaphorConsent = { environment: true, screenshot: true }`. Only a literal `true`
+  counts. Read it each time the dialog opens; a consented checkbox is hidden and a note says the
+  signup consent applies. Without it, the checkbox shows unchecked.
 - Never throw into the host page. Every entry point catches and stays silent. A disabled or
   unreachable widget must be a no-op.
-- Load once (`window.__metaphorLoaded`). No globals beyond that unless documented here.
+- Load once (`window.__metaphorLoaded`). No globals beyond that and the host-owned
+  `window.metaphorConsent` (read only) unless documented here.
 - UI lives in a Shadow DOM root; never touch or restyle host elements.
 - Disabled buttons do not emit `click`: detect rage/dead clicks with a capture-phase
   `pointerdown` listener on `document` (measured in BugLab-shop docs/FUNCTIONAL_SPEC.md §9.3).

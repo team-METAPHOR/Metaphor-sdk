@@ -28,6 +28,17 @@ SDK 파일은 별도 CDN이 아니라 Metaphor 백엔드가 `<api_base>/sdk/v1/`
 
 이 옵션이 포함된 SDK 버전을 배포해야 적용됩니다. 기존 0.1.0 파일에는 이 옵션이 없습니다.
 
+## 회원가입 때 받은 동의 쓰기
+
+사이트가 회원가입 등에서 신고용 정보 전송 동의를 이미 받았다면, 로그인한 회원에게 아래처럼 알려 줍니다.
+신고 창을 열 때마다 이 값을 읽고, `true`인 항목의 체크박스를 숨긴 채 동의한 것으로 보냅니다.
+로그아웃 등으로 값을 지우면 다시 체크박스를 보여 줍니다.
+
+```js
+window.metaphorConsent = { environment: true, screenshot: true }; // 로그인한 회원이 동의함
+delete window.metaphorConsent; // 로그아웃
+```
+
 ## 개발
 
 ```bash
