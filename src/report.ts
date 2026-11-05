@@ -5,7 +5,7 @@ export interface Draft {
   readonly screenshot: boolean;
 }
 
-export function buildPayload(draft: Draft, href = location.href) {
+export function buildPayload(draft: Draft, href = location.href, detection?: Detection) {
   const page = new URL(href);
   page.search = "";
   page.hash = "";
@@ -13,7 +13,7 @@ export function buildPayload(draft: Draft, href = location.href) {
     title: draft.title,
     description: draft.description,
     page_url: page.href,
-    error_type: "manual" as const,
+    ...(detection ?? { error_type: "manual" as const }),
     consent: { environment: draft.environment, screenshot: draft.screenshot },
     ...(draft.environment
       ? {
@@ -30,3 +30,5 @@ export function buildPayload(draft: Draft, href = location.href) {
       : {}),
   };
 }
+
+import type { Detection } from "./detect";

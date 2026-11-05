@@ -33,6 +33,7 @@ export async function mockWidget(page: Page, config = defaultConfig()): Promise<
   const requests: RecordedRequest[] = [];
   await page.route(`${SITE}/**`, (route) => {
     const path = new URL(route.request().url()).pathname;
+    if (path === "/api/fail") return route.fulfill({ status: 502, body: "private response body" });
     if (path === "/sdk/metaphor.js") {
       return route.fulfill({
         contentType: "text/javascript",

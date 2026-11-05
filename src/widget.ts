@@ -1,5 +1,6 @@
 import { submitReport, type WidgetConfig } from "./api";
 import { captureViewport } from "./capture";
+import { type Detection, startDetection } from "./detect";
 import { buildPayload } from "./report";
 import type { ScriptConfig } from "./script-config";
 
@@ -13,7 +14,7 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
     #launch{position:fixed;right:20px;bottom:20px;z-index:2147483647;background:#172033;color:white;box-shadow:0 4px 20px #0003}
     dialog{position:fixed;margin:auto;width:min(440px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;border:1px solid #cbd5e1;border-radius:16px;padding:24px;background:white;color:#172033;box-shadow:0 12px 48px #0004}
     dialog::backdrop{background:#0005}h2{margin:0 0 20px;font-size:22px}label{display:block;margin:14px 0 6px}input[type=text],textarea{width:100%;border:1px solid #94a3b8;border-radius:8px;padding:10px}textarea{min-height:120px;resize:vertical}.actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}#submit{background:#172033;color:white}p{line-height:1.5}input[type=checkbox]{width:18px;height:18px;vertical-align:middle}button:disabled{opacity:.5;cursor:wait}
-    </style><button id="launch" type="button">버그 신고</button><dialog aria-labelledby="heading"><form>
+    </style><button id="launch" type="button">버그 신고</button><button id="hint" type="button" hidden style="position:fixed;bottom:76px;right:20px;z-index:2147483647;max-width:calc(100vw - 40px)">오류가 감지되었습니다. 신고하기</button><dialog aria-labelledby="heading"><form>
     <h2 id="heading">버그 신고</h2><label for="title">제목</label><input id="title" type="text" maxlength="200">
     <label for="description">설명</label><textarea id="description" required></textarea>
     <label><input id="environment" type="checkbox"> 브라우저 환경 정보 전송에 동의합니다</label>
@@ -48,23 +49,49 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
   let pending: { signature: string; key: string; form: FormData } | undefined;
   let retryAt = 0;
   let attempts = 0;
+  let busy = false;
+  let detection: Detection | undefined;
+  const hint = root.querySelector("#hint");
+  let suggested: Detection | undefined;
+  const stopDetection = startDetection(config, settings.apiBase, (value) => {
+    if (dialog.open || !host.isConnected) return;
+    suggested = value;
+    if (hint instanceof HTMLElement) hint.hidden = false;
+  });
+  hint?.addEventListener("click", () => {
+    if (dialog.open) return;
+    detection = suggested;
+    title.value = "감지된 오류 신고";
+    description.value = suggested?.error.message ?? "";
+    if (hint instanceof HTMLElement) hint.hidden = true;
+    submit.disabled = false;
+    dialog.showModal();
+  });
   launch.addEventListener("click", () => {
-    if (!dialog.open) dialog.showModal();
+    if (!dialog.open) {
+      detection = undefined;
+      dialog.showModal();
+    }
   });
   root.querySelector("#cancel")?.addEventListener("click", () => dialog.close());
   const send = async () => {
     if (submit.disabled || Date.now() < retryAt) return;
-    const payload = buildPayload({
-      title: title.value,
-      description: description.value,
-      environment: environment.checked,
-      screenshot: screenshotConsent(),
-    });
+    const payload = buildPayload(
+      {
+        title: title.value,
+        description: description.value,
+        environment: environment.checked,
+        screenshot: screenshotConsent(),
+      },
+      location.href,
+      detection,
+    );
     const signature = JSON.stringify(payload);
     if (new Blob([signature]).size > 32768 || payload.page_url.length > 2048) {
       status.textContent = "내용이 너무 깁니다. 설명을 줄여 주세요.";
       return;
     }
+    if (pending?.signature === signature && attempts >= 3) return;
     if (!pending || pending.signature !== signature) {
       if (!payload.description.trim() && !screenshotConsent()) {
         status.textContent = "설명을 입력해 주세요.";
@@ -108,6 +135,8 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
       return;
     }
     if (result.status === 429) {
+      stopDetection();
+      if (hint instanceof HTMLElement) hint.hidden = true;
       retryAt =
         result.code === "DAILY_LIMIT_EXCEEDED"
           ? Date.parse(`${new Date(Date.now() + 86400000).toISOString().slice(0, 10)}T00:00:00Z`)
@@ -134,18 +163,30 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
     )
       host.remove();
     else {
+      if (result.code === "AUTO_DETECT_DISABLED") {
+        stopDetection();
+        detection = undefined;
+      }
       pending = undefined;
     }
   };
   form.addEventListener("submit", (event) => {
     event.preventDefault();
-    void send().catch(() => {
-      status.textContent = "신고를 준비하지 못했습니다. 다시 시도해 주세요.";
-      submit.disabled = false;
-    });
+    if (busy) return;
+    busy = true;
+    form.inert = true;
+    void send()
+      .catch(() => {
+        status.textContent = "신고를 준비하지 못했습니다. 다시 시도해 주세요.";
+        submit.disabled = false;
+      })
+      .finally(() => {
+        busy = false;
+        form.inert = false;
+      });
   });
   document.body.append(host);
   form.addEventListener("input", () => {
-    if (pending === undefined) submit.disabled = false;
+    if (!busy) submit.disabled = false;
   });
 }
