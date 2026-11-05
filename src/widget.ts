@@ -17,6 +17,7 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
     #launch{position:fixed;right:var(--float-gap);bottom:var(--float-gap);z-index:var(--layer);background:var(--ink);color:var(--surface);box-shadow:var(--shadow-float)}
     dialog{position:fixed;margin:auto;width:min(var(--panel-width),calc(100vw - var(--viewport-gap)));max-height:calc(100dvh - var(--viewport-gap));overflow:auto;border:var(--border-width) solid var(--edge);border-radius:var(--radius-dialog);padding:var(--space3);background:var(--surface);color:var(--ink);box-shadow:var(--shadow-dialog)}
     dialog::backdrop{background:var(--backdrop)}h2{margin:0 0 var(--space3);font-size:var(--heading-size)}label{display:block;margin:var(--space2) 0 var(--space1);word-break:keep-all;overflow-wrap:anywhere}label:has(input[type=checkbox]){display:flex;align-items:center;gap:var(--space1);min-height:var(--control-height)}input[type=text],textarea{width:100%;border:var(--border-width) solid var(--edge);border-radius:var(--radius-field);padding:var(--field-padding);background:var(--surface);color:var(--ink)}textarea{min-height:var(--textarea-height);resize:vertical}.actions{display:flex;flex-wrap:wrap;gap:var(--space1);justify-content:flex-end;margin-top:var(--space3)}#submit{background:var(--ink);color:var(--surface)}p{line-height:var(--line-height);overflow-wrap:anywhere}input[type=checkbox]{width:var(--checkbox-size);height:var(--checkbox-size);flex-shrink:0;accent-color:var(--focus)}button:disabled{background:var(--edge);color:var(--surface);cursor:default}#hint{position:fixed;bottom:calc(var(--float-gap) + var(--control-height) + var(--space3));right:var(--float-gap);z-index:var(--layer);max-width:calc(100vw - 2 * var(--float-gap))}
+    #launch[hidden]~#hint{bottom:var(--float-gap)}
     </style><button id="launch" type="button">버그 신고</button><button id="hint" type="button" hidden>오류가 감지되었습니다. 신고하기</button><dialog aria-labelledby="heading"><form>
     <h2 id="heading">버그 신고</h2><label for="title">제목</label><input id="title" type="text" maxlength="200">
     <label for="description">설명</label><textarea id="description" required></textarea>
@@ -50,6 +51,7 @@ export function mountWidget(settings: ScriptConfig, config: WidgetConfig) {
     !status
   )
     return;
+  launch.hidden = settings.showLauncher === false;
   description.maxLength = Math.min(8000, config.limits.max_description);
   dialog.addEventListener("keydown", (event) => {
     if (event.key !== "Tab") return;

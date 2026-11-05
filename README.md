@@ -11,6 +11,20 @@
 - 백엔드 API 계약: `Metaphor-back/docs/api/widget-sdk.md`
 - 개발 규칙과 보안 규칙: [AGENTS.md](AGENTS.md)
 
+## 상시 신고 버튼 숨기기
+
+상시 표시되는 `버그 신고` 버튼만 숨기려면 SDK 태그에 `data-metaphor-show-launcher="false"`를 추가합니다.
+속성을 생략하면 기존처럼 표시됩니다. 자동 오류 감지·레이지클릭 안내·안내를 통한 사용자 신고는 그대로 동작합니다.
+
+```html
+<script src="https://<cdn>/sdk/metaphor.js"
+        data-metaphor-project-key="mpk_..."
+        data-metaphor-api-base="https://api.<metaphor>"
+        data-metaphor-show-launcher="false" defer></script>
+```
+
+이 옵션이 포함된 SDK 버전을 배포해야 적용됩니다. 기존 0.1.0 파일에는 이 옵션이 없습니다.
+
 ## 개발
 
 ```bash
