@@ -22,6 +22,7 @@ export function defaultConfig() {
     widget_enabled: true,
     reporting_enabled: true,
     screenshot_allowed: true,
+    activity_allowed: false,
     auto_detect: { enabled: true, js_error: true, unhandled_rejection: true, http_5xx: true },
     limits: { max_screenshot_bytes: 4194304, max_description: 8000, max_mask_boxes: 20 },
     mask_selectors: ["[data-private]", "[data-sensitive]", "input[type=password]"],
@@ -42,7 +43,10 @@ export async function mockWidget(page: Page, config = defaultConfig()): Promise<
     }
     return route.fulfill({
       contentType: "text/html; charset=utf-8",
-      body: readFileSync("e2e/fixtures/site.html", "utf8"),
+      body: readFileSync(
+        config.activity_allowed ? "e2e/fixtures/activity.html" : "e2e/fixtures/site.html",
+        "utf8",
+      ),
     });
   });
   await page.route(`${API}/**`, async (route) => {

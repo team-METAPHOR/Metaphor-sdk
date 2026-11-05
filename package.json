@@ -1,6 +1,6 @@
 {
   "name": "@metaphor/web-sdk",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "private": true,
   "description": "Metaphor Web SDK: in-page bug reporting for customer sites",
   "type": "module",

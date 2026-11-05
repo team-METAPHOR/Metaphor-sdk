@@ -1,4 +1,6 @@
 /** Client for the backend widget API (Metaphor-back docs/api/widget-sdk.md). No cookies, ever. */
+
+import type { RecentActivity } from "./activity";
 import type { ScriptConfig } from "./script-config";
 
 export type HttpMethod = "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
@@ -19,7 +21,12 @@ export type ReportPayload = {
   readonly title?: string;
   readonly description?: string;
   readonly page_url: string;
-  readonly consent?: { readonly environment?: boolean; readonly screenshot?: boolean };
+  readonly consent?: {
+    readonly environment?: boolean;
+    readonly screenshot?: boolean;
+    readonly activity?: boolean;
+  };
+  readonly activity?: RecentActivity;
   readonly environment?: {
     readonly user_agent?: string;
     readonly language?: string;
@@ -33,6 +40,7 @@ export interface WidgetConfig {
   widget_enabled: boolean;
   reporting_enabled: boolean;
   screenshot_allowed: boolean;
+  activity_allowed?: boolean;
   auto_detect: {
     enabled: boolean;
     js_error: boolean;
